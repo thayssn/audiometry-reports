@@ -1,0 +1,260 @@
+.print-page-wrapper {
+  flex: 1;
+  position: relative;
+  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  .scroll-to-top {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    box-shadow: var(--box-shadow);
+
+    @media print {
+      & {
+        display: none !important;
+      }
+    }
+  }
+}
+
+.print-page-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.5em 0;
+
+  @media print {
+    & {
+      display: none !important;
+    }
+  }
+
+  @media screen and (max-width: 640px) {
+    & {
+      padding: 0.5em 0;
+    }
+  }
+}
+
+.print-page-container {
+  box-shadow: inset 5px 5px 10px 0 var(--color-background-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-background);
+  padding: 2rem 1rem;
+
+  @media print {
+    & {
+      background-color: var(--white) !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+  }
+
+  @media screen and (max-width: 1600px) {
+    & {
+      zoom: 0.6;
+    }
+  }
+
+  @media screen and (max-width: 1240px) {
+    & {
+      zoom: 0.45;
+    }
+  }
+
+  @media screen and (max-width: 960px) {
+    & {
+      width: 100%;
+      padding: 0;
+      transform-origin: top center;
+      margin: 0 auto;
+    }
+  }
+
+  @media screen and (max-width: 640px) {
+    & {
+      zoom: 0.3;
+    }
+  }
+}
+
+.print-page {
+  text-align: left;
+  background-color: var(--color-background-lightest);
+  overflow-y: auto;
+  box-shadow: 4px 4px 15px 0 var(--color-background-dark);
+  padding: 1cm 1.5cm 2cm 1.5cm;
+  line-height: 1.2;
+  font-size: 0.34cm;
+  max-width: 21cm;
+  box-sizing: border-box;
+
+  @media print {
+    & {
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0.4cm 1.4cm !important;
+      margin: 0 !important;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+  }
+
+  .print-logo{
+    max-width: 40%;
+    margin: 2cm auto;
+    display: block;
+
+    @media print {
+      & {
+        max-width: 30% !important;
+        height: auto !important;
+        margin: 0.5cm auto 1cm auto !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
+      }
+    }
+  }
+
+  #signature{
+    position: absolute;
+    right: 0;
+    width: 50%;
+    padding: 0.2cm 2cm 1cm;
+    border-top: 1px solid black; 
+    text-align: center;
+    margin-top: 2cm;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @media print {
+      & {
+        page-break-before: auto;
+      }
+    }
+  }
+
+  h1 {
+    margin-top: 2em;
+    margin-bottom: 0.75em;
+    font-size: 0.8cm;
+    padding-bottom: 0.2em;
+
+    @media print {
+      & {
+        page-break-before: auto !important;
+        page-break-after: avoid !important;
+        margin-top: 0.5cm !important;
+        margin-bottom: 0.5cm !important;
+      }
+    }
+  }
+
+  h2 {
+    margin-top: 1.2em;
+    margin-bottom: 0.5em;
+    margin-bottom: 0.5em;
+    font-size: 0.6cm;
+    font-weight: 500;
+  }
+
+  h3 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-size: 0.5cm;
+  }
+
+  h4 {
+    font-size: 0.4cm;
+    font-weight: 500;
+    margin: 1em 0 0.2em 0;
+    line-height: 1;
+  }
+
+  h5 {
+    font-size: 0.3cm;
+    font-weight: 500;
+    margin: 0.2em 0;
+    line-height: 1;
+  }
+
+  h6 {
+    font-size: 0.2cm;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  span {
+    &.bold {
+      font-weight: bold;
+    }
+
+    &.italic {
+      font-style: italic;
+    }
+
+    &.underline {
+      text-decoration: underline;
+    }
+  }
+
+  p {
+    line-height: 1.4;
+    margin: 0.8em 0 0 0.6cm;
+  }
+
+  table {
+    border-collapse: collapse;
+    border: none;
+    box-shadow: none;
+    text-align: left;
+    font-size: 0.25cm;
+    margin: 0.5cm 0;
+
+    thead {
+      font-weight: bold;
+      background-color: var(--color-background);
+      text-align: center;
+    }
+
+    td {
+      padding: 0.2cm 0.25cm;
+      border: 1px solid var(--color-background);
+      vertical-align: top;
+    }
+  }
+
+  pre {
+    padding: 0.2cm;
+    line-height: 0;
+    background-color: white;
+    border: 1px solid var(--color-background);
+  }
+
+  code {
+    padding: 0.2em;
+    font-size: 0.25cm;
+    line-height: 1;
+  }
+
+  li {
+    margin: 0.2cm 0 0 0.6cm;
+  }
+}

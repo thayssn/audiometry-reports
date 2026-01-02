@@ -1,0 +1,545 @@
+.reports-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+
+  .reports-header {
+    margin-bottom: 2rem;
+
+    h1 {
+      color: var(--color-darkest);
+      margin: 0 0 0.5rem 0;
+      font-size: 2rem;
+    }
+
+    .subtitle {
+      color: var(--secondary);
+      margin: 0;
+      font-size: 1.1rem;
+    }
+  }
+
+  .loading-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--secondary);
+  }
+
+  .warning-box {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+
+    .warning-icon {
+      font-size: 2rem;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .warning-content {
+      flex: 1;
+
+      h3 {
+        margin: 0 0 0.5rem 0;
+        color: #856404;
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+
+      p {
+        margin: 0;
+        color: #856404;
+        line-height: 1.5;
+
+        a {
+          color: #0056b3;
+          text-decoration: underline;
+          font-weight: 600;
+
+          &:hover {
+            color: #003d82;
+          }
+        }
+      }
+    }
+  }
+}
+
+// CSV Upload Component
+.csv-upload {
+  background: var(--color-background-lightest);
+  border: 1px solid var(--color-background-dark);
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+  h3 {
+    margin: 0 0 1.5rem 0;
+    color: var(--color-dark);
+    font-size: 1.3rem;
+  }
+
+  .file-input-wrapper {
+    margin-bottom: 1rem;
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .file-label {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      background: var(--color-light);
+      color: var(--dark);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+
+      &:hover {
+        background: var(--color);
+        color: var(--color-lightest);
+      }
+    }
+  }
+
+  .upload-options {
+    margin: 1rem 0;
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.95rem;
+
+      input[type="checkbox"] {
+        cursor: pointer;
+      }
+    }
+  }
+
+  .upload-actions {
+    margin-top: 1rem;
+
+    button {
+      margin-right: 0.5rem;
+    }
+  }
+
+  .preview-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid var(--color-background-dark);
+
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+
+      h4 {
+        margin: 0;
+        color: var(--color-dark);
+      }
+
+      p {
+        margin: 0;
+        color: var(--secondary);
+      }
+    }
+
+    .preview-table-wrapper {
+      overflow-x: auto;
+      margin-bottom: 1.5rem;
+    }
+
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+
+      th, td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid var(--color-background-dark);
+      }
+
+      th {
+        background: var(--color-background);
+        font-weight: 600;
+        color: var(--dark);
+      }
+
+      tbody tr:hover {
+        background: var(--color-background-light);
+      }
+    }
+
+    .preview-actions {
+      display: flex;
+      gap: 1rem;
+
+      .import-btn {
+        background: var(--success);
+        color: var(--color-lightest);
+
+        &:hover {
+          background: var(--color-dark);
+        }
+      }
+    }
+  }
+}
+
+// Filter Bar Component
+.filter-bar {
+  background: var(--color-background-lightest);
+  border: 1px solid var(--color-background-dark);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+  .filter-row {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1.5fr 1.2fr 2fr auto;
+    gap: 1.5rem;
+    align-items: end;
+
+    @media (max-width: 1024px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .filter-group {
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--dark);
+      font-size: 0.9rem;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid var(--color-background-darkest);
+      border-radius: 4px;
+      font-size: 1rem;
+      background: var(--color-background-lightest);
+
+      &:focus {
+        outline: none;
+        border-color: var(--color);
+        box-shadow: 0 0 0 3px rgba(65, 105, 225, 0.1);
+      }
+    }
+
+    select {
+      cursor: pointer;
+      
+      &:hover {
+        border-color: var(--color);
+      }
+    }
+  }
+
+  .age-inputs, .date-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    input {
+      flex: 1;
+    }
+
+    span {
+      color: var(--secondary);
+      font-size: 0.9rem;
+    }
+  }
+
+  .filter-actions {
+    display: flex;
+    align-items: flex-end;
+
+    .clear-btn {
+      background: var(--color-background-dark);
+      color: var(--dark);
+
+      &:hover {
+        background: var(--secondary);
+        color: var(--color-lightest);
+      }
+    }
+  }
+}
+
+// Patient Table Component
+.reports-table-wrapper {
+  background: var(--color-background-lightest);
+  border: 1px solid var(--color-background-dark);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--color-background-dark);
+
+    .table-count {
+      font-weight: 600;
+      color: var(--color-dark);
+      font-size: 0.95rem;
+    }
+
+    .table-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .btn-export-csv {
+      background: var(--color);
+      color: var(--color-lightest);
+      padding: 0.4rem 0.75rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+
+      &:hover {
+        background: var(--color-dark);
+        transform: translateY(-1px);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+    }
+
+    .btn-export-pdf {
+      background: var(--error);
+      color: var(--color-lightest);
+      padding: 0.4rem 0.75rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+
+      &:hover {
+        background: var(--error-dark);
+        transform: translateY(-1px);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+    }
+
+    .btn-clear-all {
+      background: var(--error);
+      color: var(--color-lightest);
+      padding: 0.4rem 0.75rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+
+      &:hover {
+        background: var(--error-dark);
+        transform: translateY(-1px);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+    }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--secondary);
+
+    p {
+      margin: 0.5rem 0;
+    }
+
+    .hint {
+      font-size: 0.9rem;
+      color: var(--color-dark);
+    }
+  }
+
+  .table-container {
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+  }
+
+  .reports-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th, td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--color-background-dark);
+    }
+
+    th {
+      background: var(--color-background);
+      font-weight: 600;
+      color: var(--dark);
+      position: sticky;
+      top: 0;
+
+      &.sortable {
+        cursor: pointer;
+        user-select: none;
+
+        &:hover {
+          background: var(--color-background-dark);
+        }
+      }
+    }
+
+    tbody tr {
+      cursor: pointer;
+      transition: background 0.2s;
+
+      &:hover {
+        background: var(--color-light);
+      }
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+
+      &.completed {
+        background: var(--success);
+        color: var(--color-lightest);
+      }
+
+      &.pending {
+        background: var(--warning);
+        color: var(--dark);
+      }
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .action-btn {
+      padding: 0.5rem 0.75rem;
+      font-size: 1.2rem;
+      min-width: auto;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: transparent;
+
+      &.btn-edit {
+        color: var(--color-primary);
+        
+        &:hover {
+          background: var(--color-background-dark);
+          color: white;
+          transform: scale(1.1);
+        }
+      }
+
+      &.btn-delete {
+        color: var(--error);
+        
+        &:hover {
+          background: var(--error);
+          color: white;
+          transform: scale(1.1);
+        }
+      }
+    }
+  }
+
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+
+    .pagination-info {
+      color: var(--secondary);
+      font-size: 0.9rem;
+    }
+
+    .pagination-controls {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+
+      button {
+        min-width: 40px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+
+        &.active {
+          background: var(--color);
+          color: var(--color-lightest);
+        }
+
+        &:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
+
+      .ellipsis {
+        color: var(--secondary);
+        padding: 0 0.25rem;
+      }
+    }
+  }
+}
+
+@media print {
+  .reports-page {
+    display: none !important;
+  }
+}
+

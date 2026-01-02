@@ -1,0 +1,937 @@
+import { createSignal, onMount, createEffect, Show } from "solid-js";
+import { useSearchParams, useNavigate } from "@solidjs/router";
+import toast from "solid-toast";
+import jsPDF from "jspdf";
+import RenderMarkdown from "../RenderMarkdown";
+import IdentificationSection from "./IdentificationSection";
+import ExaminerSection from "./ExaminerSection";
+import HistorySection from "./HistorySection";
+import ResultsSection from "./ResultsSection";
+import ConclusionSection from "./ConclusionSection";
+import RecommendationsSection from "./RecommendationsSection";
+import { dbService, Report, isReportComplete, AppSettings, DEFAULT_SETTINGS } from "../../services/dbService";
+import { IDENTIFICATION_FIELDS, getFieldConfig, getCSVFields } from "../../config/fields";
+
+// IMPORTANT: When adding identification fields, update src/config/fields.ts first
+// Then sync this identification structure with the config
+type FormData = {
+    identification: {
+        name: string;
+        age: number;
+        birth_date: Date;
+        admission_date: Date;
+        last_sequential_exam_date: Date;
+        position: string;
+        department: string;
+    };
+    history: string[];
+    results: string[]; // Simplified: "2023 - Texto do resultado"
+    conclusion: string;
+    recommendations: string[]
+}
+
+// Predefined options for each field
+const HISTORY_OPTIONS = [
+  "Paciente trabalha em ambiente com ruído ocupacional",
+  "Histórico familiar de perda auditiva",
+  "Não há informações adicionais relevantes nos demais exames audiométricos",
+  "Paciente relata exposição a ruído recreacional frequente"
+];
+
+const RESULTS_OPTIONS = [
+  "Limiares dentro dos padrões da normalidade",
+  "Perda auditiva Neurossensorial",
+  "Limiares mantidos estáveis",
+  "Perda auditiva bilateral leve",
+  "Perda auditiva bilateral moderada",
+  "Perda auditiva bilateral severa",
+  "Perda auditiva unilateral"
+];
+
+const RECOMMENDATIONS_OPTIONS = [
+  "Uso contínuo e adequado de EPI auricular nas atividades laborais",
+  "Acompanhamento audiométrico anual para monitoramento da evolução",
+  "Evitar exposição a ruído intenso sem proteção auditiva",
+  "Avaliação otorrinolaringológica",
+  "Reavaliação audiométrica em 6 meses"
+];
+
+import "./Form.scss";
+
+export default function Editor() {
+    
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  
+  const [form, setForm] = createSignal<FormData>({
+    identification: {
+        name: "",
+        age: 0,
+        birth_date: new Date(),
+        admission_date: new Date(),
+        last_sequential_exam_date: new Date(),
+        position: "",
+        department: ""
+    },
+    history: [],
+    results: [],
+    conclusion: "",
+    recommendations: []
+  });
+  const [content, setContent] = createSignal("");
+  
+  // Start with false to match SSR, then load from localStorage on client
+  const [showPreview, setShowPreview] = createSignal(false);
+  const [currentReportId, setCurrentReportId] = createSignal<string | number | null>(null);
+  const [isLoadingReport, setIsLoadingReport] = createSignal(false);
+  const [totalReports, setTotalReports] = createSignal(0);
+  const [allReportIds, setAllReportIds] = createSignal<number[]>([]);
+  const [isSaved, setIsSaved] = createSignal(false);
+  const [isSaving, setIsSaving] = createSignal(false);
+  const [previewLoaded, setPreviewLoaded] = createSignal(false);
+  const [settings, setSettings] = createSignal<AppSettings>(DEFAULT_SETTINGS);
+  const [examiner, setExaminer] = createSignal({ name: '', crfa: '' });
+
+  // Load preview preference and total reports count on mount
+  onMount(async () => {
+    try {
+      await dbService.init();
+      
+      // Load settings
+      const loadedSettings = await dbService.getSettings();
+      setSettings(loadedSettings);
+      
+      // Initialize examiner with settings values for new reports
+      if (!searchParams.reportId) {
+        setExaminer({
+          name: loadedSettings.examinerName,
+          crfa: loadedSettings.examinerCRFa
+        });
+      }
+      
+      // Load total reports count and IDs
+      const count = await dbService.getReportsCount();
+      setTotalReports(count);
+      
+      const ids = await dbService.getAllReportIds();
+      setAllReportIds(ids);
+      console.log('All report IDs:', ids);
+      
+      // Load preview preference from localStorage (client-side only)
+      try {
+        const saved = localStorage.getItem('audiometry-preview-visible');
+        if (saved !== null) {
+          setShowPreview(saved === 'true');
+        }
+        setPreviewLoaded(true);
+      } catch (error) {
+        console.error('Failed to load preview preference:', error);
+        setPreviewLoaded(true);
+      }
+    } catch (error) {
+      console.error('Error initializing:', error);
+    }
+
+    // Add keyboard shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Cmd (Mac) or Ctrl (Windows/Linux)
+      const modifier = e.metaKey || e.ctrlKey;
+      
+      // Ctrl/Cmd + N: New report
+      if (modifier && e.key === 'n') {
+        e.preventDefault();
+        navigate('/form');
+        return;
+      }
+      
+      // Ctrl/Cmd + S: Save
+      if (modifier && e.key === 's') {
+        e.preventDefault();
+        // Prevent multiple saves if already saving
+        if (!isSaving()) {
+          handleSaveForm();
+        }
+        return;
+      }
+      
+      // Ctrl/Cmd + Left Arrow: Previous report
+      if (modifier && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goToPreviousReport();
+        return;
+      }
+      
+      // Ctrl/Cmd + Right Arrow: Next report
+      if (modifier && e.key === 'ArrowRight') {
+        e.preventDefault();
+        goToNextReport();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  });
+
+  // Load report data when reportId changes
+  createEffect(async () => {
+    const reportIdParam = searchParams.reportId;
+    const reportId = Array.isArray(reportIdParam) ? reportIdParam[0] : reportIdParam;
+    
+    // Always reload total count and IDs when effect runs
+    try {
+      const count = await dbService.getReportsCount();
+      setTotalReports(count);
+      
+      const ids = await dbService.getAllReportIds();
+      setAllReportIds(ids);
+    } catch (error) {
+      console.error('Error loading reports count:', error);
+    }
+    
+    if (!reportId) {
+      // No report selected - reset form to empty state
+      setCurrentReportId(null);
+      setIsSaved(false);
+      setForm({
+        identification: {
+          name: "",
+          age: 0,
+          birth_date: new Date(),
+          admission_date: new Date(),
+          last_sequential_exam_date: new Date(),
+          position: "",
+          department: ""
+        },
+        history: [],
+        results: [],
+        conclusion: "",
+        recommendations: []
+      });
+      return;
+    }
+
+    try {
+      setIsLoadingReport(true);
+      setCurrentReportId(reportId);
+      
+      console.log('Report ID from URL:', reportId);
+      
+      // Initialize DB if needed
+      await dbService.init();
+      
+      // Load report data
+      const report = await dbService.getReport(reportId);
+      console.log('Loaded report:', report);
+      
+      if (report) {
+        setForm({
+          identification: {
+            ...report.identification,
+            birth_date: new Date(report.identification.birth_date),
+            admission_date: new Date(report.identification.admission_date),
+            last_sequential_exam_date: new Date(report.identification.last_sequential_exam_date)
+          },
+          history: report.history || [],
+          results: report.results || [],
+          conclusion: report.conclusion || "",
+          recommendations: report.recommendations || []
+        });
+        
+        // Load examiner data from report
+        if (report.examiner) {
+          setExaminer({
+            name: report.examiner.name || '',
+            crfa: report.examiner.crfa || ''
+          });
+        }
+        
+        setIsSaved(true);
+        console.log('Form updated with report data');
+      } else {
+        toast.error('Relatório não encontrado');
+      }
+    } catch (error) {
+      console.error('Error loading report data:', error);
+      toast.error('Erro ao carregar dados do relatório');
+    } finally {
+      setIsLoadingReport(false);
+    }
+  });
+
+  // Auto-render template when form changes
+  createEffect(() => {
+    renderTemplate();
+  });
+
+  // Save preview visibility to localStorage when it changes (only after initial load)
+  createEffect(() => {
+    if (!previewLoaded()) return; // Don't save until we've loaded the initial preference
+    
+    try {
+      localStorage.setItem('audiometry-preview-visible', String(showPreview()));
+    } catch (error) {
+      console.error('Failed to save preview visibility:', error);
+    }
+  });
+
+  const handleSaveForm = async () => {
+    // Prevent duplicate saves
+    if (isSaving()) {
+      console.log('Save already in progress, skipping...');
+      return;
+    }
+
+    const formData = form();
+    
+    // Validate required field: name
+    if (!formData.identification.name || formData.identification.name.trim() === '') {
+      toast.error('Nome é obrigatório para salvar o relatório');
+      return;
+    }
+
+    setIsSaving(true);
+    
+    const reportId = currentReportId();
+    
+    // Auto-fill examiner with settings if empty
+    let examinerData = examiner();
+    if (!examinerData.name && !examinerData.crfa) {
+      examinerData = {
+        name: settings().examinerName,
+        crfa: settings().examinerCRFa
+      };
+      // Update the state so it shows in the form
+      setExaminer(examinerData);
+    }
+    
+    // Save complete report to IndexedDB
+    const report: Report = {
+      id: reportId || undefined,
+      identification: formData.identification,
+      examiner: examinerData,
+      history: formData.history,
+      results: formData.results,
+      conclusion: formData.conclusion,
+      recommendations: formData.recommendations,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      const savedReportId = await dbService.saveReport(report);
+      
+      // If this was a new report, update URL, state, and count
+      if (!reportId) {
+        setCurrentReportId(savedReportId);
+        navigate(`/form?reportId=${savedReportId}`, { replace: true });
+        
+        // Update total count and IDs
+        const count = await dbService.getReportsCount();
+        setTotalReports(count);
+        
+        const ids = await dbService.getAllReportIds();
+        setAllReportIds(ids);
+      }
+      
+      setIsSaved(true);
+      toast.success("Relatório salvo com sucesso!");
+    } catch (error) {
+      toast.error("Erro ao salvar relatório");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+
+  // Update form field handlers
+  const handleUpdateIdentification = (field: keyof FormData['identification'], value: string | number | Date) => {
+    setForm((prev) => ({
+      ...prev,
+      identification: {
+        ...prev.identification,
+        [field]: value
+      }
+    }));
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  const handleUpdateExaminer = (field: 'name' | 'crfa', value: string) => {
+    setExaminer((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  const handleUpdateField = (field: keyof FormData, value: string | string[]) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  const handleUpdateArrayField = (field: 'history' | 'results' | 'recommendations', value: string) => {
+    const items = value.split('\n').filter(item => item.trim());
+    setForm((prev) => ({
+      ...prev,
+      [field]: items
+    }));
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  // Handle checkbox selection for array fields
+  const handleToggleOption = (field: 'history' | 'recommendations', option: string) => {
+    setForm((prev) => {
+      const currentArray = prev[field] || [];
+      const exists = currentArray.includes(option);
+      
+      return {
+        ...prev,
+        [field]: exists 
+          ? currentArray.filter(item => item !== option)
+          : [...currentArray, option]
+      };
+    });
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  // Handle custom text input for "Other" option
+  const handleAddCustomOption = (field: 'history' | 'recommendations', value: string) => {
+    if (!value.trim()) return;
+    
+    setForm((prev) => {
+      const currentArray = prev[field] || [];
+      return {
+        ...prev,
+        [field]: [...currentArray, value.trim()]
+      };
+    });
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  // Remove custom option
+  const handleRemoveCustomOption = (field: 'history' | 'recommendations', option: string) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: prev[field].filter(item => item !== option)
+    }));
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  // Check if option is selected
+  const isOptionSelected = (field: 'history' | 'recommendations', option: string) => {
+    return form()[field]?.includes(option) || false;
+  };
+
+  // Get custom options (not in predefined list)
+  const getCustomOptions = (field: 'history' | 'recommendations', predefinedOptions: string[]) => {
+    return form()[field]?.filter(item => !predefinedOptions.includes(item)) || [];
+  };
+
+  // Year results handlers
+  const handleAddYearResult = (year: string, result: string) => {
+    if (!year.trim() || !result.trim()) return;
+    
+    // Store as simple string: "2023 - Resultado texto"
+    const resultText = `${year.trim()} - ${result.trim()}`;
+    
+    setForm((prev) => ({
+      ...prev,
+      results: [...prev.results, resultText]
+    }));
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  const handleRemoveYearResult = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      results: prev.results.filter((_, i) => i !== index)
+    }));
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  const handleUpdateYearResult = (index: number, year: string, result: string) => {
+    if (!year.trim() || !result.trim()) return;
+    
+    const resultText = `${year.trim()} - ${result.trim()}`;
+    
+    setForm((prev) => ({
+      ...prev,
+      results: prev.results.map((item, i) => 
+        i === index ? resultText : item
+      )
+    }));
+    setIsSaved(false); // Mark as unsaved when data changes
+  };
+
+  // Format functions for each section
+  const formatIdentification = (data: FormData['identification']) => {
+    const formatDate = (date: Date) => {
+      return date instanceof Date && !isNaN(date.getTime())
+        ? date.toLocaleDateString('pt-BR')
+        : '';
+    };
+    
+    const lines = IDENTIFICATION_FIELDS.map(field => {
+      const value = data[field.key as keyof typeof data];
+      let formattedValue: string;
+      
+      if (field.type === 'date' && value instanceof Date) {
+        formattedValue = formatDate(value);
+      } else if (field.type === 'number') {
+        formattedValue = `${value}${field.key === 'age' ? ' anos' : ''}`;
+      } else {
+        formattedValue = String(value);
+      }
+      
+      const label = field.reportLabel || field.label;
+      return `- **${label}**: ${formattedValue};`;
+    });
+    
+    // Add examiner info if available
+    const examinerName = examiner().name;
+    const examinerCRFa = examiner().crfa;
+    if (examinerName || examinerCRFa) {
+      lines.push(`- **Examinador**: ${examinerName}${examinerCRFa ? ` - ${examinerCRFa}` : ''};`);
+    }
+    
+    return `## 1. Identificação\n\n${lines.join('\n')}`;
+  };
+
+  const formatHistory = (history: string[]) => {
+    const content = history.length ? history.join('\n\n') : '';
+    return `## 2. Histórico
+
+${content}`;
+  };
+
+  const formatResults = (results: string[]) => {
+    let content = '';
+    if (results.length) {
+      // Make year (before " - ") bold: "2023 - Text" becomes "**2023** - Text"
+      const formattedResults = results.map(r => {
+        const dashIndex = r.indexOf(' - ');
+        if (dashIndex > 0) {
+          const year = r.substring(0, dashIndex);
+          const text = r.substring(dashIndex + 3);
+          return `**${year}** - ${text}`;
+        }
+        return r;
+      });
+      content = formattedResults.join('\n');
+    }
+    return `## 3. Resultado / Evolutivo Audiométrico (avaliação cronológica)
+
+${content}`;
+  };
+
+  const formatConclusion = (conclusion: string) => {
+    return `## 4. Conclusão
+
+${conclusion}`;
+  };
+
+  const formatRecommendations = (recommendations: string[]) => {
+    const content = recommendations.length 
+      ? recommendations.map(rec => `- ${rec};`).join('\n')
+      : '';
+    return `## 5. Recomendações
+
+${content}`;
+  };
+
+  // Main function to render form into template
+  const renderTemplate = () => {
+    const formData = form();
+    const sections = [
+      '# Relatório Evolutivo Audiométrico\n',
+      formatIdentification(formData.identification),
+      formatHistory(formData.history),
+      formatResults(formData.results),
+      formatConclusion(formData.conclusion),
+      formatRecommendations(formData.recommendations)
+    ];
+
+    const formattedContent = sections.join('\n\n');
+    setContent(formattedContent);
+    return formattedContent;
+  };
+
+  const handleFormatForm = () => {
+    renderTemplate();
+    toast.success("Template rendered successfully!");
+  };
+
+
+  // Navigation between reports - using actual report IDs from database
+  const canGoPrevious = () => {
+    const currentId = currentReportId();
+    if (!currentId) return false;
+    
+    const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
+    const ids = allReportIds();
+    const currentIndex = ids.indexOf(idNum);
+    
+    return currentIndex > 0;
+  };
+
+  const canGoNext = () => {
+    const currentId = currentReportId();
+    if (!currentId) return false;
+    
+    const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
+    const ids = allReportIds();
+    const currentIndex = ids.indexOf(idNum);
+    
+    return currentIndex >= 0 && currentIndex < ids.length - 1;
+  };
+
+  const goToPreviousReport = () => {
+    if (!canGoPrevious()) {
+      console.log('Cannot go to previous report (already at first)');
+      return;
+    }
+    
+    const currentId = currentReportId();
+    const idNum = typeof currentId === 'string' ? parseInt(currentId as string) : currentId!;
+    const ids = allReportIds();
+    const currentIndex = ids.indexOf(idNum);
+    const previousId = ids[currentIndex - 1];
+    
+    console.log(`Navigating from report ${idNum} (index ${currentIndex}) to ${previousId} (index ${currentIndex - 1})`);
+    navigate(`/form?reportId=${previousId}`);
+  };
+
+  const goToNextReport = () => {
+    if (!canGoNext()) {
+      console.log(`Cannot go to next report (already at last, total: ${totalReports()})`);
+      return;
+    }
+    
+    const currentId = currentReportId();
+    const idNum = typeof currentId === 'string' ? parseInt(currentId as string) : currentId!;
+    const ids = allReportIds();
+    const currentIndex = ids.indexOf(idNum);
+    const nextId = ids[currentIndex + 1];
+    
+    console.log(`Navigating from report ${idNum} (index ${currentIndex}) to ${nextId} (index ${currentIndex + 1})`);
+    navigate(`/form?reportId=${nextId}`);
+  };
+
+  // Download functions for PDF and CSV
+  const handleDownloadPDF = async () => {
+    if (!currentReportId()) {
+      toast.error('Nenhum relatório carregado');
+      return;
+    }
+
+    try {
+      toast.loading("Gerando PDF...", { id: 'pdf-download' });
+
+      const currentSettings = settings();
+      const markdownContent = content();
+
+      // Simple markdown to HTML conversion
+      let htmlContent = markdownContent
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^- (.+?);$/gm, '<li>$1</li>')
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>');
+
+      // Create a container optimized for pdf.html()
+      const tempContainer = document.createElement('div');
+      tempContainer.style.width = '170mm'; // Content width
+      tempContainer.style.fontFamily = 'Arial, sans-serif';
+      tempContainer.style.fontSize = '11pt';
+      tempContainer.style.lineHeight = '1.4';
+      tempContainer.style.color = '#000000';
+      
+      tempContainer.innerHTML = `
+        <div style="text-align: center; margin-bottom: 1cm; page-break-inside: avoid;">
+          <img src="${currentSettings.logoUrl}" style="max-width: 50mm; height: auto;" />
+        </div>
+        <div>
+          ${htmlContent
+            .replace(/<h1>/g, '<h1 style="font-size: 16pt; font-weight: 700; margin: 0.8cm 0 0.3cm 0; page-break-after: avoid;">')
+            .replace(/<h2>/g, '<h2 style="font-size: 14pt; font-weight: 700; margin: 0.6cm 0 0.25cm 0; page-break-after: avoid;">')
+            .replace(/<h3>/g, '<h3 style="font-size: 12pt; font-weight: 700; margin: 0.4cm 0 0.2cm 0; page-break-after: avoid;">')
+            .replace(/<strong>/g, '<strong style="font-weight: 700;">')
+            .replace(/<li>/g, '<li style="margin-bottom: 0.1cm; line-height: 1.4;">')
+            .replace(/<ul>/g, '<ul style="margin: 0.2cm 0; padding-left: 1cm;">')
+            .replace(/<br><br>/g, '<p style="margin: 0.2cm 0;"></p>')
+          }
+        </div>
+        <div style="margin-top: 2cm; text-align: center; page-break-inside: avoid;">
+          <div style="border-top: 1px solid #000000; width: 150px; margin: 0 auto 0.3cm auto;"></div>
+          <p style="margin: 0; font-size: 11pt; font-weight: 700;">${currentSettings.signatureName}</p>
+          <p style="margin: 0; font-size: 10pt;">${currentSettings.signatureCRFa}</p>
+        </div>
+      `;
+
+      // Use jsPDF's html method for proper pagination
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      await pdf.html(tempContainer, {
+        callback: function (doc) {
+          const timestamp = new Date().toISOString().split('T')[0];
+          doc.save(`relatorio-${timestamp}.pdf`);
+          toast.success("PDF baixado com sucesso!", { id: 'pdf-download' });
+        },
+        x: 20,
+        y: 15,
+        width: 170, // Content width (210mm - 40mm margins)
+        windowWidth: 800, // Reference width for scaling
+        margin: [15, 20, 15, 20], // top, right, bottom, left in mm
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Erro ao gerar PDF", { id: 'pdf-download' });
+    }
+  };
+
+  const handleDownloadCSV = () => {
+    if (!currentReportId()) {
+      toast.error('Nenhum relatório carregado');
+      return;
+    }
+
+    try {
+      const report = form() as Report;
+      
+      // Get CSV fields configuration for identification
+      const csvFields = getCSVFields();
+      
+      // Create CSV header - identification fields + report fields
+      const headers = [
+        ...csvFields.map(field => field.csvColumns[0]),
+        'history',
+        'results',
+        'conclusion',
+        'recommendations'
+      ];
+      const csvHeader = headers.join(',');
+      
+      // Helper to escape CSV values
+      const escapeCSV = (value: string) => {
+        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      };
+      
+      // Identification fields
+      const identificationValues = csvFields.map(field => {
+        const value = report.identification[field.key as keyof typeof report.identification];
+        
+        // Format dates as DD/MM/YYYY
+        if (field.type === 'date' && value) {
+          const date = new Date(value);
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        }
+        
+        return escapeCSV(String(value || ''));
+      });
+      
+      // History - join with semicolon
+      const history = report.history ? report.history.join('; ') : '';
+      
+      // Results - join with semicolon
+      const results = report.results ? report.results.join('; ') : '';
+      
+      // Conclusion
+      const conclusion = report.conclusion || '';
+      
+      // Recommendations - join with semicolon
+      const recommendations = report.recommendations ? report.recommendations.join('; ') : '';
+      
+      // Create CSV row
+      const csvRow = [
+        ...identificationValues,
+        escapeCSV(history),
+        escapeCSV(results),
+        escapeCSV(conclusion),
+        escapeCSV(recommendations)
+      ].join(',');
+      
+      // Combine header and row
+      const csvContent = [csvHeader, csvRow].join('\n');
+      
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      const timestamp = new Date().toISOString().split('T')[0];
+      link.setAttribute('href', url);
+      link.setAttribute('download', `relatorio-${report.identification.name.replace(/\s+/g, '-')}-${timestamp}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("CSV baixado com sucesso!");
+    } catch (error) {
+      console.error("Error generating CSV:", error);
+      toast.error("Erro ao gerar CSV");
+    }
+  };
+
+  return (
+    <div class="form-wrapper" classList={{ "preview-hidden": !showPreview() }}>
+        <Show when={isLoadingReport()}>
+          <div class="loading-indicator">
+            <div class="spinner"></div>
+          </div>
+        </Show>
+        
+        <div class="form-container">
+          <div class="form-header">
+            <div class="header-top">
+              <div class="header-title">
+                <h2>{form().identification.name || "Novo Relatório"}</h2>
+                <div class="status-badges">
+                  <Show when={currentReportId()}>
+                    <span class="save-status" classList={{ 
+                      "status-saved": isSaved(), 
+                      "status-pending": !isSaved(),
+                      "status-saving": isSaving()
+                    }}>
+                      {isSaving() ? "⏳ Salvando..." : isSaved() ? "✓ Salvo" : "● Não salvo"}
+                    </span>
+                  </Show>
+                  <Show when={currentReportId()}>
+                    <span class="completion-status" classList={{
+                      "status-complete": !!isReportComplete(form() as Report),
+                      "status-incomplete": !isReportComplete(form() as Report)
+                    }}>
+                      {isReportComplete(form() as Report) ? "📋 Completo" : "📝 Incompleto"}
+                    </span>
+                  </Show>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" onClick={() => setShowPreview(!showPreview())} title="Toggle Preview">
+                  {showPreview() ? "👁️ Ocultar Preview" : "👁️ Mostrar Preview"}
+                </button>
+                <Show when={currentReportId()}>
+                  <button type="button" onClick={handleDownloadPDF} title="Download PDF">
+                    📄 PDF
+                  </button>
+                  <button type="button" onClick={handleDownloadCSV} title="Download CSV">
+                    📥 CSV
+                  </button>
+                </Show>
+                <button type="button" onClick={handleSaveForm} title="Salvar (Ctrl/Cmd + S)">
+                  💾 Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
+            <div class="form-grid">
+              <div class="form-grid-item">
+                <IdentificationSection 
+                  identification={() => form().identification}
+                  onUpdate={handleUpdateIdentification}
+                />
+                
+                <ExaminerSection 
+                  examiner={examiner}
+                  onUpdate={handleUpdateExaminer}
+                />
+              </div>
+
+              <div class="form-grid-item">
+                <HistorySection 
+                  history={() => form().history}
+                  predefinedOptions={HISTORY_OPTIONS}
+                  isOptionSelected={(option) => isOptionSelected('history', option)}
+                  onToggleOption={(option) => handleToggleOption('history', option)}
+                  onRemoveCustomOption={(option) => handleRemoveCustomOption('history', option)}
+                  getCustomOptions={() => getCustomOptions('history', HISTORY_OPTIONS)}
+                  onAddCustomOption={(value) => handleAddCustomOption('history', value)}
+                />
+              </div>
+
+              <div class="form-grid-item">
+                <ResultsSection 
+                  results={() => form().results}
+                  predefinedOptions={RESULTS_OPTIONS}
+                  onAddYearResult={handleAddYearResult}
+                  onRemoveYearResult={handleRemoveYearResult}
+                  onUpdateYearResult={handleUpdateYearResult}
+                />
+              </div>
+
+              <div class="form-grid-item form-grid-stacked">
+                <ConclusionSection 
+                  conclusion={() => form().conclusion}
+                  onUpdate={(value) => handleUpdateField('conclusion', value)}
+                />
+
+                <RecommendationsSection 
+                  recommendations={() => form().recommendations}
+                  predefinedOptions={RECOMMENDATIONS_OPTIONS}
+                  isOptionSelected={(option) => isOptionSelected('recommendations', option)}
+                  onToggleOption={(option) => handleToggleOption('recommendations', option)}
+                  onRemoveCustomOption={(option) => handleRemoveCustomOption('recommendations', option)}
+                  getCustomOptions={() => getCustomOptions('recommendations', RECOMMENDATIONS_OPTIONS)}
+                  onAddCustomOption={(value) => handleAddCustomOption('recommendations', value)}
+                />
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {showPreview() && (
+            <RenderMarkdown content={content} />
+        )}
+
+        <Show when={currentReportId()}>
+          <div class="patient-navigation-bottom">
+            <button 
+              type="button" 
+              onClick={goToPreviousReport}
+              disabled={!canGoPrevious()}
+              title="Relatório Anterior (Ctrl/Cmd + ←)"
+            >
+              ⬅️ Anterior
+            </button>
+            <span class="patient-counter">
+              {(() => {
+                const currentId = currentReportId();
+                if (!currentId) return '';
+                const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
+                const ids = allReportIds();
+                const currentIndex = ids.indexOf(idNum);
+                if (currentIndex === -1) return `ID ${currentId} de ${totalReports()}`;
+                return `${currentIndex + 1} de ${totalReports()}`;
+              })()}
+            </span>
+            <button 
+              type="button" 
+              onClick={goToNextReport}
+              disabled={!canGoNext()}
+              title="Próximo Relatório (Ctrl/Cmd + →)"
+            >
+              Próximo ➡️
+            </button>
+          </div>
+        </Show>
+    </div>
+  );
+}

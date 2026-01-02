@@ -1,0 +1,68 @@
+.app-header {
+  background: var(--color-background-lightest);
+  border-bottom: 2px solid var(--color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+
+  @media print {
+    display: none !important;
+  }
+
+  .header-content {
+    margin: 0 auto;
+    width: 100%;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+  }
+  
+  .logo-link {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .logo {
+    color: var(--color);
+    margin: 0;
+    font-size: clamp(1.2rem, 4vw, 2rem);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+
+    &:hover {
+      color: var(--color-dark);
+    }
+  }
+
+  .main-nav {
+    display: flex;
+    gap: 1rem;
+
+    .nav-link {
+      padding: 0.75rem 1.5rem;
+      text-decoration: none;
+      color: var(--dark);
+      background: var(--color-background);
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+
+      &:hover {
+        background: var(--color-light);
+        color: var(--color-darkest);
+      }
+
+      &.active {
+        background: var(--color);
+        color: var(--color-lightest);
+      }
+    }
+  }
+}
+

@@ -1,0 +1,62 @@
+name,age,birth_date,admission_date,position,department
+João da Silva,45,1973-01-15,2018-03-15,Operador de Máquinas,Produção
+Maria Santos,52,1971-12-10,2019-06-22,Supervisora,Qualidade
+Pedro Oliveira,38,1985-08-20,2020-01-10,Técnico de Manutenção,Manutenção
+Ana Costa,61,1962-05-03,2017-08-05,Coordenadora,Recursos Humanos
+Carlos Ferreira,29,1994-09-12,2021-11-18,Auxiliar de Produção,Produção
+Juliana Almeida,47,1976-07-25,2019-04-03,Analista de Compras,Suprimentos
+Roberto Souza,55,1968-11-08,2018-09-27,Gerente,Logística
+Fernanda Lima,33,1990-04-16,2022-02-14,Assistente Administrativo,Administrativo
+Ricardo Pereira,42,1981-06-30,2020-07-30,Eletricista,Manutenção
+Patrícia Martins,50,1973-10-22,2019-05-12,Analista de Qualidade,Qualidade
+Lucas Rodrigues,35,1988-03-14,2020-09-08,Soldador,Produção
+Mariana Carvalho,41,1982-11-28,2019-12-15,Técnica de Segurança,Segurança do Trabalho
+Gabriel Barbosa,28,1995-07-05,2022-05-20,Operador de Empilhadeira,Logística
+Camila Ribeiro,53,1970-09-17,2018-02-11,Supervisora,Produção
+Diego Mendes,46,1977-12-03,2019-08-25,Mecânico Industrial,Manutenção
+Amanda Nascimento,31,1992-05-22,2021-07-18,Auxiliar de Almoxarifado,Logística
+Thiago Azevedo,39,1984-10-09,2020-04-12,Programador CNC,Produção
+Beatriz Moreira,57,1966-06-15,2017-11-30,Coordenadora,Qualidade
+Felipe Castro,44,1979-02-28,2019-03-07,Técnico Eletrônico,Manutenção
+Larissa Cardoso,36,1987-08-11,2021-01-24,Assistente de RH,Recursos Humanos
+Bruno Araújo,49,1974-04-25,2018-10-16,Inspetor de Qualidade,Qualidade
+Isabela Dias,32,1991-01-19,2022-08-03,Auxiliar Administrativo,Administrativo
+Marcos Gomes,54,1969-07-30,2017-12-22,Gerente,Produção
+Tatiana Rocha,40,1983-03-08,2020-06-14,Analista de Processos,Engenharia
+Rafael Correia,27,1996-11-12,2023-02-28,Operador de Produção,Produção
+Daniela Lopes,48,1975-09-26,2018-07-09,Técnica Química,Laboratório
+Gustavo Teixeira,34,1989-12-04,2021-10-05,Torneiro Mecânico,Produção
+Carolina Monteiro,56,1967-05-18,2017-09-19,Supervisora,Logística
+Leandro Freitas,43,1980-08-23,2019-11-11,Pintor Industrial,Produção
+Vanessa Pinto,30,1993-06-07,2022-03-26,Auxiliar de Limpeza,Facilities
+Eduardo Borges,51,1972-10-14,2018-05-30,Coordenador,Manutenção
+Renata Campos,37,1986-02-01,2020-12-08,Analista Fiscal,Financeiro
+Anderson Silva,26,1997-04-29,2023-06-15,Montador,Produção
+Priscila Cavalcanti,45,1978-12-20,2019-01-17,Supervisora,Administrativo
+Rodrigo Nunes,58,1965-07-02,2017-03-25,Gerente Industrial,Produção
+Adriana Guimarães,33,1990-09-13,2021-09-22,Analista de TI,Tecnologia
+Fábio Macedo,47,1976-11-27,2018-11-04,Caldeireiro,Manutenção
+Cristina Duarte,41,1982-05-10,2020-02-19,Compradora,Suprimentos
+Vinícius Fernandes,29,1994-08-06,2022-11-07,Operador de Prensa,Produção
+Aline Barros,52,1971-03-24,2018-08-13,Coordenadora,Suprimentos
+Marcelo Rezende,38,1985-10-18,2020-10-29,Técnico de Instrumentação,Manutenção
+Luciana Morais,55,1968-06-09,2017-06-12,Gerente,Qualidade
+Felipe Andrade,31,1992-12-15,2021-12-20,Encarregado,Produção
+Simone Xavier,46,1977-04-03,2019-05-08,Analista Contábil,Financeiro
+André Vieira,42,1981-08-28,2020-03-16,Fresador,Produção
+Bruna Farias,28,1995-02-14,2022-07-25,Recepcionista,Administrativo
+Henrique Pacheco,50,1973-07-21,2018-12-02,Coordenador,Engenharia
+Claudia Ramos,36,1987-11-05,2021-04-14,Auxiliar de Expedição,Logística
+Sérgio Lima,59,1964-09-30,2017-02-07,Diretor,Operações
+Michele Soares,34,1989-05-16,2021-06-30,Analista de Dados,Tecnologia
+Alexandre Costa,48,1975-01-08,2019-09-23,Supervisor,Manutenção
+Fernanda Gonçalves,32,1991-10-25,2022-01-11,Assistente de Compras,Suprimentos
+Márcio Santos,44,1979-06-19,2019-10-28,Ferramenteiro,Produção
+Paula Moura,53,1970-03-12,2018-04-05,Coordenadora,Laboratório
+Willian Peixoto,37,1986-12-07,2020-11-18,Técnico de Automação,Manutenção
+Raquel Batista,40,1983-08-01,2020-08-22,Analista de Treinamento,Recursos Humanos
+José Carlos Melo,60,1963-04-27,2017-07-14,Gerente,Manutenção
+Elaine Torres,35,1988-09-22,2021-03-09,Auxiliar Contábil,Financeiro
+Flávio Sampaio,49,1974-11-16,2018-09-06,Inspetor de Soldagem,Qualidade
+Sabrina Leal,30,1993-02-09,2022-04-28,Auxiliar de Recursos Humanos,Recursos Humanos
+

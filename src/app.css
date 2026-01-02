@@ -1,0 +1,111 @@
+:root {
+  /* Royal Blue Color Scheme */
+  --color: #4169E1; /* Royal Blue */
+  --color-dark: #2952CC; /* Darker Royal Blue */
+  --color-darkest: #000000; /* Black */
+  --color-light: #6B8FF5; /* Light Royal Blue */
+  --color-lightest: #FFFFFF; /* White */
+  
+  /* Background Colors */
+  --color-background: #F5F7FF; /* Very Light Blue */
+  --color-background-dark: #E1E8FF; /* Light Blue Gray */
+  --color-background-darkest: #C5D1F0; /* Blue Gray */
+  --color-background-light: #FAFBFF; /* Almost White with Blue Tint */
+  --color-background-lightest: #FFFFFF; /* Pure White */
+  
+  /* Box Shadows */
+  --box-shadow-inset: inset -4px -4px 10px 0 var(--color),
+    inset 2px 2px 10px 0 var(--color-lightest);
+  --box-shadow-inset-reverse: inset 2px 2px 5px 0 var(--color),
+    inset -2px -2px 5px 0 var(--color-lightest);
+  
+  /* Status Colors */
+  --warning: #FFB84D; /* Orange Warning */
+  --error: #E74C3C; /* Red Error */
+  --error-dark: #c0392b; /* Dark Red Error (hover) */
+  --info: #4169E1; /* Royal Blue Info */
+  --primary: #4169E1; /* Royal Blue Primary */
+  --secondary: #2C3E50; /* Dark Gray/Black */
+  --success: #27ae60; /* Green Success */
+  --danger: #E74C3C; /* Red Danger */
+  --light: #F5F7FF; /* Light Blue */
+  --dark: #1a1a1a; /* Almost Black */
+  --white: #ffffff; /* Pure White */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Gordita, Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans",
+    "Helvetica Neue", sans-serif;
+  padding: 0;
+  margin: 0;
+  background-color: var(--color-background-light);
+}
+
+header {
+  display: flex;
+  align-items: space-between;
+  justify-content: center;
+}
+
+
+main {
+  text-align: center;
+  margin: 0 auto;
+  padding: 0.5em;
+}
+
+h1 {
+  max-width: unset;
+}
+
+p {
+  max-width: unset;
+}
+
+button {
+  border: none;
+  padding: 1em;
+  cursor: pointer;
+  display: inline-block;
+  font-size: min(2vw, 0.7rem);
+  text-transform: uppercase;
+  border: 1px solid var(--color);
+  background-color: var(--color-light);
+  color: var(--color-lightest);
+  transition: 0.2s background-color;
+  border-radius: 4px;
+  margin: 0.5em;
+}
+
+button:hover {
+  background-color: var(--color);
+}
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  header {
+    display: none !important;
+  }
+
+  * {
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    text-shadow: none !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
