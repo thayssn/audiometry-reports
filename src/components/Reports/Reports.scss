@@ -390,7 +390,10 @@
 
   .table-container {
     overflow-x: auto;
+    overflow-y: auto;
+    max-height: 600px;
     margin-bottom: 1.5rem;
+    position: relative;
   }
 
   .reports-table {
@@ -409,6 +412,8 @@
       color: var(--dark);
       position: sticky;
       top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 
       &.sortable {
         cursor: pointer;

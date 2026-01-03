@@ -132,8 +132,8 @@
   }
 
   #signature{
-    position: absolute;
-    right: 0;
+    position: relative;
+    right: -50%;
     width: 50%;
     padding: 0.2cm 2cm 1cm;
     border-top: 1px solid black; 

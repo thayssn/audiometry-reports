@@ -277,6 +277,12 @@ class DBService {
   }
 
   async clearAllData(): Promise<void> {
+    await this.init();
+    if (!this.db) throw new Error('Database not initialized');
+
+    // Save current settings before clearing
+    const currentSettings = await this.getSettings();
+    
     // Close any existing connection first
     if (this.db) {
       this.db.close();
@@ -289,13 +295,21 @@ class DBService {
       console.log('Attempting to delete database:', DB_NAME);
       const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
       
-      deleteRequest.onsuccess = () => {
+      deleteRequest.onsuccess = async () => {
         console.log('✅ Database deleted successfully! AutoIncrement counter reset.');
         // Reinitialize the database (creates a fresh one)
-        this.init().then(() => {
+        try {
+          await this.init();
           console.log('✅ Fresh database initialized. Next ID will be 1.');
+          
+          // Restore settings
+          await this.saveSettings(currentSettings);
+          console.log('✅ Settings restored.');
+          
           resolve();
-        }).catch(reject);
+        } catch (error) {
+          reject(error);
+        }
       };
       
       deleteRequest.onerror = (event) => {

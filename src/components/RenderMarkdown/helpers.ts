@@ -104,30 +104,3 @@ export const renderHTMLLine = (line: string): string => {
 
   return `\n<p>${formattedLine}</p>`;
 };
-
-export const getPrintableContent = (content: string): string => {
-  const styles = Array.from(document.styleSheets)
-    .map((sheet) => {
-      try {
-        return Array.from(sheet.cssRules)
-          .map((rule) => rule.cssText)
-          .join("\n");
-      } catch {
-        return "";
-      }
-    })
-    .join("\n");
-
-  return `
-      <html>
-        <head>
-          <style>${styles}</style>
-        </head>
-        <body>
-          <div id="printable-area" class="print-page">
-            ${content}
-          </div>
-        </body>
-      </html>
-    `;
-};

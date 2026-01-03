@@ -116,6 +116,10 @@ export default function CSVUpload(props: Props) {
       const position = columnIndices.has('position') ? values[columnIndices.get('position')!] : '';
       const department = columnIndices.has('department') ? values[columnIndices.get('department')!] : '';
       
+      // Check for examiner fields
+      const examinerNameIdx = headers.findIndex(h => h === 'examiner_name');
+      const examinerCrfaIdx = headers.findIndex(h => h === 'examiner_crfa');
+      
       // Check for additional report fields
       const historyIdx = headers.findIndex(h => h === 'history');
       const resultsIdx = headers.findIndex(h => h === 'results');
@@ -163,6 +167,10 @@ export default function CSVUpload(props: Props) {
       const conclusion = conclusionIdx !== -1 ? values[conclusionIdx] : '';
       const recommendations = recommendationsIdx !== -1 && values[recommendationsIdx] ? values[recommendationsIdx].split(';').map(s => s.trim()).filter(s => s) : [];
 
+      // Extract examiner information
+      const examinerName = examinerNameIdx !== -1 ? (values[examinerNameIdx] || '') : '';
+      const examinerCrfa = examinerCrfaIdx !== -1 ? (values[examinerCrfaIdx] || '') : '';
+
       // Create report with empty fields
       reports.push({
         identification: {
@@ -175,8 +183,8 @@ export default function CSVUpload(props: Props) {
           department
         },
         examiner: {
-          name: '',
-          crfa: ''
+          name: examinerName,
+          crfa: examinerCrfa
         },
         history,
         results,

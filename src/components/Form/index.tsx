@@ -1,7 +1,6 @@
 import { createSignal, onMount, createEffect, Show } from "solid-js";
 import { useSearchParams, useNavigate } from "@solidjs/router";
 import toast from "solid-toast";
-import jsPDF from "jspdf";
 import RenderMarkdown from "../RenderMarkdown";
 import IdentificationSection from "./IdentificationSection";
 import ExaminerSection from "./ExaminerSection";
@@ -11,9 +10,15 @@ import ConclusionSection from "./ConclusionSection";
 import RecommendationsSection from "./RecommendationsSection";
 import { dbService, Report, isReportComplete, AppSettings, DEFAULT_SETTINGS } from "../../services/dbService";
 import { IDENTIFICATION_FIELDS, getFieldConfig, getCSVFields } from "../../config/fields";
+import { generatePDF } from "../../utils/pdfGenerator";
 
 // IMPORTANT: When adding identification fields, update src/config/fields.ts first
 // Then sync this identification structure with the config
+type ResultEntry = {
+    year: string;
+    text: string;
+};
+
 type FormData = {
     identification: {
         name: string;
@@ -25,7 +30,7 @@ type FormData = {
         department: string;
     };
     history: string[];
-    results: string[]; // Simplified: "2023 - Texto do resultado"
+    results: ResultEntry[]; // Structured internally, converted to string[] on save
     conclusion: string;
     recommendations: string[]
 }
@@ -229,6 +234,19 @@ export default function Editor() {
       console.log('Loaded report:', report);
       
       if (report) {
+        // Convert string[] results to structured format
+        const structuredResults = (report.results || []).map(resultStr => {
+          const dashIndex = resultStr.indexOf(' - ');
+          if (dashIndex > 0) {
+            const year = resultStr.substring(0, dashIndex);
+            const text = resultStr.substring(dashIndex + 3);
+            if (/^\d{4}$/.test(year)) {
+              return { year, text };
+            }
+          }
+          return { year: '', text: resultStr };
+        });
+        
         setForm({
           identification: {
             ...report.identification,
@@ -237,7 +255,7 @@ export default function Editor() {
             last_sequential_exam_date: new Date(report.identification.last_sequential_exam_date)
           },
           history: report.history || [],
-          results: report.results || [],
+          results: structuredResults,
           conclusion: report.conclusion || "",
           recommendations: report.recommendations || []
         });
@@ -310,12 +328,17 @@ export default function Editor() {
     }
     
     // Save complete report to IndexedDB
+    // Convert structured results to string[] for storage
+    const resultsAsStrings = formData.results
+      .map(r => `${r.year.trim()} - ${r.text.trim()}`.trim())
+      .filter(s => s && s !== '-'); // Remove empty or lone hyphens
+    
     const report: Report = {
       id: reportId || undefined,
       identification: formData.identification,
       examiner: examinerData,
       history: formData.history,
-      results: formData.results,
+      results: resultsAsStrings,
       conclusion: formData.conclusion,
       recommendations: formData.recommendations,
       updated_at: new Date().toISOString()
@@ -434,18 +457,13 @@ export default function Editor() {
     return form()[field]?.filter(item => !predefinedOptions.includes(item)) || [];
   };
 
-  // Year results handlers
-  const handleAddYearResult = (year: string, result: string) => {
-    if (!year.trim() || !result.trim()) return;
-    
-    // Store as simple string: "2023 - Resultado texto"
-    const resultText = `${year.trim()} - ${result.trim()}`;
-    
+  // Year results handlers - works with structured format internally
+  const handleAddYearResult = () => {
     setForm((prev) => ({
       ...prev,
-      results: [...prev.results, resultText]
+      results: [...prev.results, { year: '', text: '' }]
     }));
-    setIsSaved(false); // Mark as unsaved when data changes
+    setIsSaved(false);
   };
 
   const handleRemoveYearResult = (index: number) => {
@@ -453,21 +471,17 @@ export default function Editor() {
       ...prev,
       results: prev.results.filter((_, i) => i !== index)
     }));
-    setIsSaved(false); // Mark as unsaved when data changes
+    setIsSaved(false);
   };
 
-  const handleUpdateYearResult = (index: number, year: string, result: string) => {
-    if (!year.trim() || !result.trim()) return;
-    
-    const resultText = `${year.trim()} - ${result.trim()}`;
-    
+  const handleUpdateYearResult = (index: number, year: string, text: string) => {
     setForm((prev) => ({
       ...prev,
       results: prev.results.map((item, i) => 
-        i === index ? resultText : item
+        i === index ? { year, text } : item
       )
     }));
-    setIsSaved(false); // Mark as unsaved when data changes
+    setIsSaved(false);
   };
 
   // Format functions for each section
@@ -511,19 +525,17 @@ export default function Editor() {
 ${content}`;
   };
 
-  const formatResults = (results: string[]) => {
+  const formatResults = (results: ResultEntry[]) => {
     let content = '';
     if (results.length) {
-      // Make year (before " - ") bold: "2023 - Text" becomes "**2023** - Text"
       const formattedResults = results.map(r => {
-        const dashIndex = r.indexOf(' - ');
-        if (dashIndex > 0) {
-          const year = r.substring(0, dashIndex);
-          const text = r.substring(dashIndex + 3);
-          return `**${year}** - ${text}`;
+        if (r.year && r.text) {
+          return `**${r.year}** - ${r.text}`;
+        } else if (r.text) {
+          return r.text;
         }
-        return r;
-      });
+        return '';
+      }).filter(Boolean);
       content = formattedResults.join('\n');
     }
     return `## 3. Resultado / Evolutivo Audiométrico (avaliação cronológica)
@@ -624,6 +636,24 @@ ${content}`;
     navigate(`/form?reportId=${nextId}`);
   };
 
+  // Helper to convert FormData to Report format for checking completeness
+  const formAsReport = (): Partial<Report> => {
+    const formData = form();
+    const resultsAsStrings = formData.results
+      .map(r => `${r.year.trim()} - ${r.text.trim()}`.trim())
+      .filter(s => s && s !== '-');
+    
+    return {
+      identification: formData.identification,
+      examiner: examiner(),
+      history: formData.history,
+      results: resultsAsStrings,
+      conclusion: formData.conclusion,
+      recommendations: formData.recommendations,
+      updated_at: new Date().toISOString()
+    };
+  };
+
   // Download functions for PDF and CSV
   const handleDownloadPDF = async () => {
     if (!currentReportId()) {
@@ -636,62 +666,12 @@ ${content}`;
 
       const currentSettings = settings();
       const markdownContent = content();
+      const patientName = form().identification.name || 'Paciente';
+      const filename = `Relatório Audiométrico - ${patientName}.pdf`;
 
-      // Simple markdown to HTML conversion
-      let htmlContent = markdownContent
-        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/^- (.+?);$/gm, '<li>$1</li>')
-        .replace(/\n\n/g, '<br><br>')
-        .replace(/\n/g, '<br>');
-
-      // Create a container optimized for pdf.html()
-      const tempContainer = document.createElement('div');
-      tempContainer.style.width = '170mm'; // Content width
-      tempContainer.style.fontFamily = 'Arial, sans-serif';
-      tempContainer.style.fontSize = '11pt';
-      tempContainer.style.lineHeight = '1.4';
-      tempContainer.style.color = '#000000';
+      await generatePDF(markdownContent, currentSettings, filename);
       
-      tempContainer.innerHTML = `
-        <div style="text-align: center; margin-bottom: 1cm; page-break-inside: avoid;">
-          <img src="${currentSettings.logoUrl}" style="max-width: 50mm; height: auto;" />
-        </div>
-        <div>
-          ${htmlContent
-            .replace(/<h1>/g, '<h1 style="font-size: 16pt; font-weight: 700; margin: 0.8cm 0 0.3cm 0; page-break-after: avoid;">')
-            .replace(/<h2>/g, '<h2 style="font-size: 14pt; font-weight: 700; margin: 0.6cm 0 0.25cm 0; page-break-after: avoid;">')
-            .replace(/<h3>/g, '<h3 style="font-size: 12pt; font-weight: 700; margin: 0.4cm 0 0.2cm 0; page-break-after: avoid;">')
-            .replace(/<strong>/g, '<strong style="font-weight: 700;">')
-            .replace(/<li>/g, '<li style="margin-bottom: 0.1cm; line-height: 1.4;">')
-            .replace(/<ul>/g, '<ul style="margin: 0.2cm 0; padding-left: 1cm;">')
-            .replace(/<br><br>/g, '<p style="margin: 0.2cm 0;"></p>')
-          }
-        </div>
-        <div style="margin-top: 2cm; text-align: center; page-break-inside: avoid;">
-          <div style="border-top: 1px solid #000000; width: 150px; margin: 0 auto 0.3cm auto;"></div>
-          <p style="margin: 0; font-size: 11pt; font-weight: 700;">${currentSettings.signatureName}</p>
-          <p style="margin: 0; font-size: 10pt;">${currentSettings.signatureCRFa}</p>
-        </div>
-      `;
-
-      // Use jsPDF's html method for proper pagination
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      await pdf.html(tempContainer, {
-        callback: function (doc) {
-          const timestamp = new Date().toISOString().split('T')[0];
-          doc.save(`relatorio-${timestamp}.pdf`);
-          toast.success("PDF baixado com sucesso!", { id: 'pdf-download' });
-        },
-        x: 20,
-        y: 15,
-        width: 170, // Content width (210mm - 40mm margins)
-        windowWidth: 800, // Reference width for scaling
-        margin: [15, 20, 15, 20], // top, right, bottom, left in mm
-      });
+      toast.success("PDF baixado com sucesso!", { id: 'pdf-download' });
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast.error("Erro ao gerar PDF", { id: 'pdf-download' });
@@ -705,13 +685,28 @@ ${content}`;
     }
 
     try {
-      const report = form() as Report;
+      const formData = form();
+      
+      // Convert structured results to string[] for CSV export
+      const resultsAsStrings = formData.results
+        .map(r => `${r.year.trim()} - ${r.text.trim()}`.trim())
+        .filter(s => s && s !== '-');
+      
+      const report: Partial<Report> = {
+        identification: formData.identification,
+        history: formData.history,
+        results: resultsAsStrings,
+        conclusion: formData.conclusion,
+        recommendations: formData.recommendations
+      };
       
       // Get CSV fields configuration for identification
       const csvFields = getCSVFields();
       
-      // Create CSV header - identification fields + report fields
+      // Create CSV header - examiner + identification fields + report fields
       const headers = [
+        'examiner_name',
+        'examiner_crfa',
         ...csvFields.map(field => field.csvColumns[0]),
         'history',
         'results',
@@ -728,9 +723,13 @@ ${content}`;
         return value;
       };
       
+      // Examiner information
+      const examinerName = escapeCSV(examiner().name || '');
+      const examinerCrfa = escapeCSV(examiner().crfa || '');
+      
       // Identification fields
       const identificationValues = csvFields.map(field => {
-        const value = report.identification[field.key as keyof typeof report.identification];
+        const value = report.identification?.[field.key as keyof typeof report.identification];
         
         // Format dates as DD/MM/YYYY
         if (field.type === 'date' && value) {
@@ -758,6 +757,8 @@ ${content}`;
       
       // Create CSV row
       const csvRow = [
+        examinerName,
+        examinerCrfa,
         ...identificationValues,
         escapeCSV(history),
         escapeCSV(results),
@@ -773,9 +774,9 @@ ${content}`;
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       
-      const timestamp = new Date().toISOString().split('T')[0];
+      const patientName = report.identification?.name || 'Paciente';
       link.setAttribute('href', url);
-      link.setAttribute('download', `relatorio-${report.identification.name.replace(/\s+/g, '-')}-${timestamp}.csv`);
+      link.setAttribute('download', `Relatório Audiométrico - ${patientName}.csv`);
       link.style.visibility = 'hidden';
       
       document.body.appendChild(link);
@@ -797,61 +798,62 @@ ${content}`;
           </div>
         </Show>
         
-        <div class="form-container">
-          <div class="form-header">
-            <div class="header-top">
-              <div class="header-title">
-                <h2>{form().identification.name || "Novo Relatório"}</h2>
-                <div class="status-badges">
-                  <Show when={currentReportId()}>
-                    <span class="save-status" classList={{ 
-                      "status-saved": isSaved(), 
-                      "status-pending": !isSaved(),
-                      "status-saving": isSaving()
-                    }}>
-                      {isSaving() ? "⏳ Salvando..." : isSaved() ? "✓ Salvo" : "● Não salvo"}
-                    </span>
-                  </Show>
-                  <Show when={currentReportId()}>
-                    <span class="completion-status" classList={{
-                      "status-complete": !!isReportComplete(form() as Report),
-                      "status-incomplete": !isReportComplete(form() as Report)
-                    }}>
-                      {isReportComplete(form() as Report) ? "📋 Completo" : "📝 Incompleto"}
-                    </span>
-                  </Show>
-                </div>
-              </div>
-              <div class="form-actions">
-                <button type="button" onClick={() => setShowPreview(!showPreview())} title="Toggle Preview">
-                  {showPreview() ? "👁️ Ocultar Preview" : "👁️ Mostrar Preview"}
-                </button>
+        <div class="form-header">
+          <div class="header-top">
+            <div class="header-title">
+              <h2>{form().identification.name || "Novo Relatório"}</h2>
+              <div class="status-badges">
                 <Show when={currentReportId()}>
-                  <button type="button" onClick={handleDownloadPDF} title="Download PDF">
-                    📄 PDF
-                  </button>
-                  <button type="button" onClick={handleDownloadCSV} title="Download CSV">
-                    📥 CSV
-                  </button>
+                  <span class="save-status" classList={{ 
+                    "status-saved": isSaved(), 
+                    "status-pending": !isSaved(),
+                    "status-saving": isSaving()
+                  }}>
+                    {isSaving() ? "⏳ Salvando..." : isSaved() ? "✓ Salvo" : "● Não salvo"}
+                  </span>
                 </Show>
-                <button type="button" onClick={handleSaveForm} title="Salvar (Ctrl/Cmd + S)">
-                  💾 Salvar
-                </button>
+                <Show when={currentReportId()}>
+                  <span class="completion-status" classList={{
+                    "status-complete": !!isReportComplete(formAsReport() as Report),
+                    "status-incomplete": !isReportComplete(formAsReport() as Report)
+                  }}>
+                    {isReportComplete(formAsReport() as Report) ? "📋 Completo" : "📝 Incompleto"}
+                  </span>
+                </Show>
               </div>
             </div>
+            <div class="form-actions">
+              <button type="button" onClick={() => setShowPreview(!showPreview())} title="Toggle Preview">
+                {showPreview() ? "👁️ Ocultar Preview" : "👁️ Mostrar Preview"}
+              </button>
+              <Show when={currentReportId()}>
+                <button type="button" onClick={handleDownloadPDF} title="Download PDF">
+                  📄 PDF
+                </button>
+                <button type="button" onClick={handleDownloadCSV} title="Download CSV">
+                  📥 CSV
+                </button>
+              </Show>
+              <button type="button" onClick={handleSaveForm} title="Salvar (Ctrl/Cmd + S)">
+                💾 Salvar
+              </button>
+            </div>
           </div>
+        </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
+        <div class="content-area">
+          <div class="form-container">
+            <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
             <div class="form-grid">
               <div class="form-grid-item">
-                <IdentificationSection 
-                  identification={() => form().identification}
-                  onUpdate={handleUpdateIdentification}
-                />
-                
                 <ExaminerSection 
                   examiner={examiner}
                   onUpdate={handleUpdateExaminer}
+                />
+                
+                <IdentificationSection 
+                  identification={() => form().identification}
+                  onUpdate={handleUpdateIdentification}
                 />
               </div>
 
@@ -871,18 +873,20 @@ ${content}`;
                 <ResultsSection 
                   results={() => form().results}
                   predefinedOptions={RESULTS_OPTIONS}
-                  onAddYearResult={handleAddYearResult}
-                  onRemoveYearResult={handleRemoveYearResult}
-                  onUpdateYearResult={handleUpdateYearResult}
+                  onAdd={handleAddYearResult}
+                  onRemove={handleRemoveYearResult}
+                  onUpdate={handleUpdateYearResult}
                 />
               </div>
 
-              <div class="form-grid-item form-grid-stacked">
+              <div class="form-grid-item">
                 <ConclusionSection 
                   conclusion={() => form().conclusion}
                   onUpdate={(value) => handleUpdateField('conclusion', value)}
                 />
+              </div>
 
+              <div class="form-grid-item">
                 <RecommendationsSection 
                   recommendations={() => form().recommendations}
                   predefinedOptions={RECOMMENDATIONS_OPTIONS}
@@ -898,38 +902,51 @@ ${content}`;
         </div>
 
         {showPreview() && (
+          <div class="preview-container">
             <RenderMarkdown content={content} />
+          </div>
         )}
+      </div>
 
-        <Show when={currentReportId()}>
+      <Show when={currentReportId()}>
           <div class="patient-navigation-bottom">
             <button 
               type="button" 
-              onClick={goToPreviousReport}
-              disabled={!canGoPrevious()}
-              title="Relatório Anterior (Ctrl/Cmd + ←)"
+              onClick={() => navigate('/patients')}
+              class="btn-back-to-list"
+              title="Voltar para lista de pacientes"
             >
-              ⬅️ Anterior
+              📋 Lista de Pacientes
             </button>
-            <span class="patient-counter">
-              {(() => {
-                const currentId = currentReportId();
-                if (!currentId) return '';
-                const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
-                const ids = allReportIds();
-                const currentIndex = ids.indexOf(idNum);
-                if (currentIndex === -1) return `ID ${currentId} de ${totalReports()}`;
-                return `${currentIndex + 1} de ${totalReports()}`;
-              })()}
-            </span>
-            <button 
-              type="button" 
-              onClick={goToNextReport}
-              disabled={!canGoNext()}
-              title="Próximo Relatório (Ctrl/Cmd + →)"
-            >
-              Próximo ➡️
-            </button>
+            <div class="navigation-controls">
+              <button 
+                type="button" 
+                onClick={goToPreviousReport}
+                disabled={!canGoPrevious()}
+                title="Relatório Anterior (Ctrl/Cmd + ←)"
+              >
+                ⬅️ Anterior
+              </button>
+              <span class="patient-counter">
+                {(() => {
+                  const currentId = currentReportId();
+                  if (!currentId) return '';
+                  const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
+                  const ids = allReportIds();
+                  const currentIndex = ids.indexOf(idNum);
+                  if (currentIndex === -1) return `ID ${currentId} de ${totalReports()}`;
+                  return `${currentIndex + 1} de ${totalReports()}`;
+                })()}
+              </span>
+              <button 
+                type="button" 
+                onClick={goToNextReport}
+                disabled={!canGoNext()}
+                title="Próximo Relatório (Ctrl/Cmd + →)"
+              >
+                Próximo ➡️
+              </button>
+            </div>
           </div>
         </Show>
     </div>
