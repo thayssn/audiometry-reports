@@ -7,8 +7,6 @@ export default function Settings() {
   const [logoUrl, setLogoUrl] = createSignal('');
   const [signatureName, setSignatureName] = createSignal('');
   const [signatureCRFa, setSignatureCRFa] = createSignal('');
-  const [examinerName, setExaminerName] = createSignal('');
-  const [examinerCRFa, setExaminerCRFa] = createSignal('');
   const [logoFile, setLogoFile] = createSignal<File | null>(null);
   const [logoPreview, setLogoPreview] = createSignal<string>('');
 
@@ -17,8 +15,6 @@ export default function Settings() {
     setLogoUrl(settings.logoUrl);
     setSignatureName(settings.signatureName);
     setSignatureCRFa(settings.signatureCRFa);
-    setExaminerName(settings.examinerName);
-    setExaminerCRFa(settings.examinerCRFa);
     setLogoPreview(settings.logoUrl);
   });
 
@@ -61,9 +57,7 @@ export default function Settings() {
       const settings: AppSettings = {
         logoUrl: finalLogoUrl,
         signatureName: signatureName(),
-        signatureCRFa: signatureCRFa(),
-        examinerName: examinerName(),
-        examinerCRFa: examinerCRFa()
+        signatureCRFa: signatureCRFa()
       };
 
       await dbService.saveSettings(settings);
@@ -82,8 +76,6 @@ export default function Settings() {
         setLogoUrl(DEFAULT_SETTINGS.logoUrl);
         setSignatureName(DEFAULT_SETTINGS.signatureName);
         setSignatureCRFa(DEFAULT_SETTINGS.signatureCRFa);
-        setExaminerName(DEFAULT_SETTINGS.examinerName);
-        setExaminerCRFa(DEFAULT_SETTINGS.examinerCRFa);
         setLogoPreview(DEFAULT_SETTINGS.logoUrl);
         setLogoFile(null);
         toast.success('Configurações restauradas!');
@@ -158,35 +150,6 @@ export default function Settings() {
               value={signatureCRFa()}
               onInput={(e) => setSignatureCRFa(e.currentTarget.value)}
               placeholder="Ex: CRFa2 - 12.876"
-            />
-          </div>
-        </div>
-
-        <div class="settings-section">
-          <h2>Examinador</h2>
-          <p class="section-description">
-            Seus dados como examinador que serão incluídos automaticamente em todos os relatórios que você criar
-          </p>
-          
-          <div class="form-group">
-            <label for="examiner-name">Seu Nome Completo</label>
-            <input
-              type="text"
-              id="examiner-name"
-              value={examinerName()}
-              onInput={(e) => setExaminerName(e.currentTarget.value)}
-              placeholder="Ex: Maria Silva Santos"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="examiner-crfa">Seu Registro CRFa</label>
-            <input
-              type="text"
-              id="examiner-crfa"
-              value={examinerCRFa()}
-              onInput={(e) => setExaminerCRFa(e.currentTarget.value)}
-              placeholder="Ex: CRFa3 - 15.432"
             />
           </div>
         </div>

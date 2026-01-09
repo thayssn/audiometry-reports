@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from "@solidjs/router";
 import toast from "solid-toast";
 import RenderMarkdown from "../RenderMarkdown";
 import IdentificationSection from "./IdentificationSection";
-import ExaminerSection from "./ExaminerSection";
 import HistorySection from "./HistorySection";
 import ResultsSection from "./ResultsSection";
 import ConclusionSection from "./ConclusionSection";
@@ -39,26 +38,28 @@ type FormData = {
 const HISTORY_OPTIONS = [
   "Paciente trabalha em ambiente com ruído ocupacional",
   "Histórico familiar de perda auditiva",
-  "Não há informações adicionais relevantes nos demais exames audiométricos",
-  "Paciente relata exposição a ruído recreacional frequente"
+  "Paciente relata exposição a ruído extra-laboral frequente",
+  "Episódios de otite na infância",
+  "Não há informações adicionais relevantes nos exames analisados",
 ];
 
 const RESULTS_OPTIONS = [
-  "Limiares dentro dos padrões da normalidade",
-  "Perda auditiva Neurossensorial",
-  "Limiares mantidos estáveis",
-  "Perda auditiva bilateral leve",
-  "Perda auditiva bilateral moderada",
-  "Perda auditiva bilateral severa",
-  "Perda auditiva unilateral"
+  "Perda auditiva Neurossensorial com configuração em entalhe, sugestivo de PAINPSE estável",
+  "Perda auditiva Neurossensorial com configuração em entalhe, sugestivo de desencadeamento de PAINPSE",
+  "Perda auditiva Neurossensorial com configuração em entalhe, sugestivo de agravamento de PAINPSE",
+  "Perda auditiva Neurossensorial com configuração descendente, sugestivo de perda auditiva NÃO induzida por NPSE",
+  "Perda auditiva Neurossensorial com configuração não sugestiva de PAINPSE",
+  "Perda auditiva com componente condutivo sugestivo de perda auditiva NÃO induzida por NPSE",
+  "Limiares auditivos dentro dos padrões da normalidade",
+  "Limiares auditivos dentro dos padrões da normalidade estáveis",
+  "Exame não realizado"
 ];
 
 const RECOMMENDATIONS_OPTIONS = [
   "Uso contínuo e adequado de EPI auricular nas atividades laborais",
   "Acompanhamento audiométrico anual para monitoramento da evolução",
-  "Evitar exposição a ruído intenso sem proteção auditiva",
-  "Avaliação otorrinolaringológica",
-  "Reavaliação audiométrica em 6 meses"
+  "Orientação quanto à exposição a ruído laboral e extra-laboral, incluindo hábitos recreativos (uso de fones de ouvido)",
+  "Encaminhamento ao otorrinolaringologista"
 ];
 
 import "./Form.scss";
@@ -95,7 +96,6 @@ export default function Editor() {
   const [isSaving, setIsSaving] = createSignal(false);
   const [previewLoaded, setPreviewLoaded] = createSignal(false);
   const [settings, setSettings] = createSignal<AppSettings>(DEFAULT_SETTINGS);
-  const [examiner, setExaminer] = createSignal({ name: '', crfa: '' });
 
   // Load preview preference and total reports count on mount
   onMount(async () => {
@@ -105,14 +105,6 @@ export default function Editor() {
       // Load settings
       const loadedSettings = await dbService.getSettings();
       setSettings(loadedSettings);
-      
-      // Initialize examiner with settings values for new reports
-      if (!searchParams.reportId) {
-        setExaminer({
-          name: loadedSettings.examinerName,
-          crfa: loadedSettings.examinerCRFa
-        });
-      }
       
       // Load total reports count and IDs
       const count = await dbService.getReportsCount();
@@ -260,14 +252,6 @@ export default function Editor() {
           recommendations: report.recommendations || []
         });
         
-        // Load examiner data from report
-        if (report.examiner) {
-          setExaminer({
-            name: report.examiner.name || '',
-            crfa: report.examiner.crfa || ''
-          });
-        }
-        
         setIsSaved(true);
         console.log('Form updated with report data');
       } else {
@@ -316,17 +300,6 @@ export default function Editor() {
     
     const reportId = currentReportId();
     
-    // Auto-fill examiner with settings if empty
-    let examinerData = examiner();
-    if (!examinerData.name && !examinerData.crfa) {
-      examinerData = {
-        name: settings().examinerName,
-        crfa: settings().examinerCRFa
-      };
-      // Update the state so it shows in the form
-      setExaminer(examinerData);
-    }
-    
     // Save complete report to IndexedDB
     // Convert structured results to string[] for storage
     const resultsAsStrings = formData.results
@@ -336,7 +309,6 @@ export default function Editor() {
     const report: Report = {
       id: reportId || undefined,
       identification: formData.identification,
-      examiner: examinerData,
       history: formData.history,
       results: resultsAsStrings,
       conclusion: formData.conclusion,
@@ -371,23 +343,40 @@ export default function Editor() {
   };
 
 
-  // Update form field handlers
-  const handleUpdateIdentification = (field: keyof FormData['identification'], value: string | number | Date) => {
-    setForm((prev) => ({
-      ...prev,
-      identification: {
-        ...prev.identification,
-        [field]: value
-      }
-    }));
-    setIsSaved(false); // Mark as unsaved when data changes
+  // Helper function to calculate age from birth date
+  const calculateAge = (birthDate: Date): number => {
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    // Adjust age if birthday hasn't occurred yet this year
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
   };
 
-  const handleUpdateExaminer = (field: 'name' | 'crfa', value: string) => {
-    setExaminer((prev) => ({
-      ...prev,
-      [field]: value
-    }));
+  // Update form field handlers
+  const handleUpdateIdentification = (field: keyof FormData['identification'], value: string | number | Date) => {
+    setForm((prev) => {
+      const updates: Partial<FormData['identification']> = {
+        [field]: value
+      };
+      
+      // If birth_date is being updated, automatically calculate age
+      if (field === 'birth_date' && value instanceof Date) {
+        updates.age = calculateAge(value);
+      }
+      
+      return {
+        ...prev,
+        identification: {
+          ...prev.identification,
+          ...updates
+        }
+      };
+    });
     setIsSaved(false); // Mark as unsaved when data changes
   };
 
@@ -507,13 +496,6 @@ export default function Editor() {
       const label = field.reportLabel || field.label;
       return `- **${label}**: ${formattedValue};`;
     });
-    
-    // Add examiner info if available
-    const examinerName = examiner().name;
-    const examinerCRFa = examiner().crfa;
-    if (examinerName || examinerCRFa) {
-      lines.push(`- **Examinador**: ${examinerName}${examinerCRFa ? ` - ${examinerCRFa}` : ''};`);
-    }
     
     return `## 1. Identificação\n\n${lines.join('\n')}`;
   };
@@ -645,7 +627,6 @@ ${content}`;
     
     return {
       identification: formData.identification,
-      examiner: examiner(),
       history: formData.history,
       results: resultsAsStrings,
       conclusion: formData.conclusion,
@@ -703,10 +684,8 @@ ${content}`;
       // Get CSV fields configuration for identification
       const csvFields = getCSVFields();
       
-      // Create CSV header - examiner + identification fields + report fields
+      // Create CSV header - identification fields + report fields
       const headers = [
-        'examiner_name',
-        'examiner_crfa',
         ...csvFields.map(field => field.csvColumns[0]),
         'history',
         'results',
@@ -722,10 +701,6 @@ ${content}`;
         }
         return value;
       };
-      
-      // Examiner information
-      const examinerName = escapeCSV(examiner().name || '');
-      const examinerCrfa = escapeCSV(examiner().crfa || '');
       
       // Identification fields
       const identificationValues = csvFields.map(field => {
@@ -757,8 +732,6 @@ ${content}`;
       
       // Create CSV row
       const csvRow = [
-        examinerName,
-        examinerCrfa,
         ...identificationValues,
         escapeCSV(history),
         escapeCSV(results),
@@ -845,18 +818,15 @@ ${content}`;
           <div class="form-container">
             <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
             <div class="form-grid">
+              {/* Item 1 */}
               <div class="form-grid-item">
-                <ExaminerSection 
-                  examiner={examiner}
-                  onUpdate={handleUpdateExaminer}
-                />
-                
                 <IdentificationSection 
                   identification={() => form().identification}
                   onUpdate={handleUpdateIdentification}
                 />
               </div>
 
+              {/* Item 2 */}
               <div class="form-grid-item">
                 <HistorySection 
                   history={() => form().history}
@@ -869,6 +839,7 @@ ${content}`;
                 />
               </div>
 
+              {/* Item 3 */}
               <div class="form-grid-item">
                 <ResultsSection 
                   results={() => form().results}
@@ -879,6 +850,7 @@ ${content}`;
                 />
               </div>
 
+              {/* Item 4 */}
               <div class="form-grid-item">
                 <ConclusionSection 
                   conclusion={() => form().conclusion}
@@ -886,6 +858,7 @@ ${content}`;
                 />
               </div>
 
+              {/* Item 5 */}
               <div class="form-grid-item">
                 <RecommendationsSection 
                   recommendations={() => form().recommendations}

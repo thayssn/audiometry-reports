@@ -4,7 +4,6 @@ export type FilterCriteria = {
   searchTerm: string;
   position: string;
   department: string;
-  examinerName: string;
   status: 'all' | 'complete' | 'incomplete';
 };
 
@@ -16,7 +15,6 @@ export default function FilterBar(props: Props) {
   const [searchTerm, setSearchTerm] = createSignal("");
   const [position, setPosition] = createSignal("");
   const [department, setDepartment] = createSignal("");
-  const [examinerName, setExaminerName] = createSignal("");
   const [status, setStatus] = createSignal<'all' | 'complete' | 'incomplete'>('all');
   
   let debounceTimeout: number | undefined;
@@ -35,7 +33,6 @@ export default function FilterBar(props: Props) {
   createEffect(() => {
     position();
     department();
-    examinerName();
     status();
     applyFilters();
   });
@@ -45,7 +42,6 @@ export default function FilterBar(props: Props) {
       searchTerm: searchTerm(),
       position: position(),
       department: department(),
-      examinerName: examinerName(),
       status: status()
     });
   };
@@ -54,12 +50,11 @@ export default function FilterBar(props: Props) {
     setSearchTerm("");
     setPosition("");
     setDepartment("");
-    setExaminerName("");
     setStatus('all');
   };
 
   const hasActiveFilters = () => {
-    return searchTerm() || position() || department() || examinerName() || status() !== 'all';
+    return searchTerm() || position() || department() || status() !== 'all';
   };
 
   return (
@@ -95,17 +90,6 @@ export default function FilterBar(props: Props) {
             placeholder="Filtrar por setor..."
             value={department()}
             onInput={(e) => setDepartment(e.currentTarget.value)}
-          />
-        </div>
-
-        <div class="filter-group">
-          <label for="examiner">Examinador</label>
-          <input
-            id="examiner"
-            type="text"
-            placeholder="Filtrar por examinador..."
-            value={examinerName()}
-            onInput={(e) => setExaminerName(e.currentTarget.value)}
           />
         </div>
 

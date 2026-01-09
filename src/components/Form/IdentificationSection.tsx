@@ -53,7 +53,10 @@ export default function IdentificationSection(props: Props) {
                       id="age" 
                       type="number"
                       value={props.identification().age}
-                      onInput={(e) => props.onUpdate('age', parseInt(e.currentTarget.value) || 0)}
+                      readonly
+                      disabled
+                      style="background-color: var(--color-lightest); cursor: not-allowed;"
+                      title="A idade é calculada automaticamente a partir da data de nascimento"
                     />
                 </div>
                 <div class="form-field">

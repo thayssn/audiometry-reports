@@ -161,7 +161,6 @@ export default function ReportsTable(props: Props) {
                 <th onClick={() => handleSort('id')} class="sortable">
                   ID {getSortIcon('id')}
                 </th>
-                <th>Examinador</th>
                 <For each={sortableFields}>
                   {(field) => (
                     <th onClick={() => handleSort(field.key as SortField)} class="sortable">
@@ -178,7 +177,6 @@ export default function ReportsTable(props: Props) {
                 {(report, index) => (
                   <tr onClick={() => props.onReportClick(String(report.id))}>
                     <td>{report.id}</td>
-                    <td>{report.examiner?.name || '-'}</td>
                     <For each={sortableFields}>
                       {(field) => {
                         const value = report.identification[field.key as keyof typeof report.identification];

@@ -61,12 +61,6 @@ export default function Reports() {
       filtered = filtered.filter(r => r.identification.department.toLowerCase().includes(term));
     }
 
-    // Filter by examiner name
-    if (filters.examinerName) {
-      const term = filters.examinerName.toLowerCase();
-      filtered = filtered.filter(r => r.examiner?.name?.toLowerCase().includes(term));
-    }
-
     // Status filter (complete vs incomplete reports)
     if (filters.status === 'complete') {
       // Complete reports (all fields filled)
@@ -153,10 +147,8 @@ export default function Reports() {
       // Get CSV fields configuration for identification
       const csvFields = getCSVFields();
       
-      // Create CSV header - examiner + identification fields + report fields
+      // Create CSV header - identification fields + report fields
       const headers = [
-        'examiner_name',
-        'examiner_crfa',
         ...csvFields.map(field => field.csvColumns[0]),
         'history',
         'results',
@@ -175,10 +167,6 @@ export default function Reports() {
       
       // Create CSV rows
       const csvRows = allReports.map(report => {
-        // Examiner information
-        const examinerName = escapeCSV(report.examiner?.name || '');
-        const examinerCrfa = escapeCSV(report.examiner?.crfa || '');
-        
         // Identification fields
         const identificationValues = csvFields.map(field => {
           const value = report.identification[field.key as keyof typeof report.identification];
@@ -208,8 +196,6 @@ export default function Reports() {
         const recommendations = report.recommendations ? report.recommendations.join('; ') : '';
         
         return [
-          examinerName,
-          examinerCrfa,
           ...identificationValues,
           escapeCSV(history),
           escapeCSV(results),
@@ -284,10 +270,7 @@ export default function Reports() {
           `**Data de Admissão:** ${formatDate(report.identification.admission_date)}\n` +
           `**Data do Último Exame Sequencial:** ${formatDate(report.identification.last_sequential_exam_date)}\n` +
           `**Cargo:** ${report.identification.position}\n` +
-          `**Setor:** ${report.identification.department}\n` +
-          (report.examiner && (report.examiner.name || report.examiner.crfa)
-            ? `**Examinador:** ${report.examiner.name}${report.examiner.crfa ? ` - ${report.examiner.crfa}` : ''}\n`
-            : ''),
+          `**Setor:** ${report.identification.department}\n`,
           
           report.history && report.history.length > 0
             ? `## 2. Histórico\n\n${report.history.map(h => `- ${h}`).join('\n')}\n`
@@ -350,20 +333,6 @@ export default function Reports() {
         <h1>Gerenciamento de Relatórios</h1>
         <p class="subtitle">Importe e gerencie relatórios audiométricos</p>
       </div>
-
-      <Show when={!settings().examinerName || !settings().examinerCRFa}>
-        <div class="warning-box">
-          <div class="warning-icon">⚠️</div>
-          <div class="warning-content">
-            <h3>Atenção: Configuração Incompleta</h3>
-            <p>
-              As informações do examinador não foram configuradas. 
-              Por favor, acesse as <a href="/settings">Configurações</a> e preencha 
-              o nome e CRFa do examinador para que os relatórios sejam gerados corretamente.
-            </p>
-          </div>
-        </div>
-      </Show>
 
       <CSVUpload onImportComplete={handleImportComplete} />
 

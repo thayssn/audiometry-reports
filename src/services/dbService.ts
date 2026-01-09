@@ -14,16 +14,12 @@ export type AppSettings = {
   logoUrl: string;
   signatureName: string;
   signatureCRFa: string;
-  examinerName: string;
-  examinerCRFa: string;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
   logoUrl: '/logo.png',
   signatureName: 'Ana Maria Carvalho de Oliveira',
-  signatureCRFa: 'CRFa2 - 12.876',
-  examinerName: '',
-  examinerCRFa: ''
+  signatureCRFa: 'CRFa2 - 12.876'
 };
 
 // IMPORTANT: When adding identification fields, update src/config/fields.ts first
@@ -38,10 +34,6 @@ export type Report = {
     last_sequential_exam_date: Date;
     position: string;
     department: string;
-  };
-  examiner: {
-    name: string;
-    crfa: string;
   };
   history: string[];
   results: string[]; // Simplified: "2023 - Texto do resultado"
