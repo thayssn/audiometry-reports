@@ -166,9 +166,9 @@ export default function ReportsTable(props: Props) {
               type="button"
               class="btn-export-pdf"
               onClick={props.onExportPDFs}
-              title={props.selectedIds.length > 0 ? "Exportar relatórios selecionados" : "Exportar todos os relatórios completos como PDF"}
+              title={props.selectedIds.length > 0 ? "Exportar relatórios selecionados para PDF" : "Exportar todos os relatórios para PDF"}
             >
-              📄 {props.selectedIds.length > 0 ? `Exportar Selecionados (${props.selectedIds.length})` : "Exportar PDFs"}
+              📄 {props.selectedIds.length > 0 ? `Exportar relatórios selecionados para PDF (${props.selectedIds.length})` : "Exportar todos os relatórios para PDF"}
             </button>
             <button
               type="button"

@@ -10,28 +10,29 @@ import RecommendationsSection from "./RecommendationsSection";
 import { dbService, Report, isReportComplete, AppSettings, DEFAULT_SETTINGS } from "../../services/dbService";
 import { IDENTIFICATION_FIELDS, getFieldConfig, getCSVFields } from "../../config/fields";
 import { generatePDF } from "../../utils/pdfGenerator";
+import { formatReportContent } from "../../utils/formatContent";
 
 // IMPORTANT: When adding identification fields, update src/config/fields.ts first
 // Then sync this identification structure with the config
 type ResultEntry = {
-    year: string;
-    text: string;
+  year: string;
+  text: string;
 };
 
 type FormData = {
-    identification: {
-        name: string;
-        age: number;
-        birth_date: Date;
-        admission_date: Date;
-        last_sequential_exam_date: Date;
-        position: string;
-        department: string;
-    };
-    history: string[];
-    results: ResultEntry[]; // Structured internally, converted to string[] on save
-    conclusion: string;
-    recommendations: string[]
+  identification: {
+    name: string;
+    age: number;
+    birth_date: Date;
+    admission_date: Date;
+    last_sequential_exam_date: Date;
+    position: string;
+    department: string;
+  };
+  history: string[];
+  results: ResultEntry[]; // Structured internally, converted to string[] on save
+  conclusion: string;
+  recommendations: string[]
 }
 
 // Predefined options for each field
@@ -65,19 +66,19 @@ const RECOMMENDATIONS_OPTIONS = [
 import "./Form.scss";
 
 export default function Editor() {
-    
+
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
+
   const [form, setForm] = createSignal<FormData>({
     identification: {
-        name: "",
-        age: 0,
-        birth_date: new Date(),
-        admission_date: new Date(),
-        last_sequential_exam_date: new Date(),
-        position: "",
-        department: ""
+      name: "",
+      age: 0,
+      birth_date: new Date(),
+      admission_date: new Date(),
+      last_sequential_exam_date: new Date(),
+      position: "",
+      department: ""
     },
     history: [],
     results: [],
@@ -85,7 +86,7 @@ export default function Editor() {
     recommendations: []
   });
   const [content, setContent] = createSignal("");
-  
+
   // Start with false to match SSR, then load from localStorage on client
   const [showPreview, setShowPreview] = createSignal(false);
   const [currentReportId, setCurrentReportId] = createSignal<string | number | null>(null);
@@ -101,19 +102,19 @@ export default function Editor() {
   onMount(async () => {
     try {
       await dbService.init();
-      
+
       // Load settings
       const loadedSettings = await dbService.getSettings();
       setSettings(loadedSettings);
-      
+
       // Load total reports count and IDs
       const count = await dbService.getReportsCount();
       setTotalReports(count);
-      
+
       const ids = await dbService.getAllReportIds();
       setAllReportIds(ids);
       console.log('All report IDs:', ids);
-      
+
       // Load preview preference from localStorage (client-side only)
       try {
         const saved = localStorage.getItem('audiometry-preview-visible');
@@ -133,14 +134,14 @@ export default function Editor() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Cmd (Mac) or Ctrl (Windows/Linux)
       const modifier = e.metaKey || e.ctrlKey;
-      
+
       // Ctrl/Cmd + N: New report
       if (modifier && e.key === 'n') {
         e.preventDefault();
         navigate('/form');
         return;
       }
-      
+
       // Ctrl/Cmd + S: Save
       if (modifier && e.key === 's') {
         e.preventDefault();
@@ -150,14 +151,14 @@ export default function Editor() {
         }
         return;
       }
-      
+
       // Ctrl/Cmd + Left Arrow: Previous report
       if (modifier && e.key === 'ArrowLeft') {
         e.preventDefault();
         goToPreviousReport();
         return;
       }
-      
+
       // Ctrl/Cmd + Right Arrow: Next report
       if (modifier && e.key === 'ArrowRight') {
         e.preventDefault();
@@ -167,7 +168,7 @@ export default function Editor() {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    
+
     // Cleanup on unmount
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
@@ -178,18 +179,18 @@ export default function Editor() {
   createEffect(async () => {
     const reportIdParam = searchParams.reportId;
     const reportId = Array.isArray(reportIdParam) ? reportIdParam[0] : reportIdParam;
-    
+
     // Always reload total count and IDs when effect runs
     try {
       const count = await dbService.getReportsCount();
       setTotalReports(count);
-      
+
       const ids = await dbService.getAllReportIds();
       setAllReportIds(ids);
     } catch (error) {
       console.error('Error loading reports count:', error);
     }
-    
+
     if (!reportId) {
       // No report selected - reset form to empty state
       setCurrentReportId(null);
@@ -215,30 +216,31 @@ export default function Editor() {
     try {
       setIsLoadingReport(true);
       setCurrentReportId(reportId);
-      
+
       console.log('Report ID from URL:', reportId);
-      
+
       // Initialize DB if needed
       await dbService.init();
-      
+
       // Load report data
       const report = await dbService.getReport(reportId);
       console.log('Loaded report:', report);
-      
+
       if (report) {
         // Convert string[] results to structured format
         const structuredResults = (report.results || []).map(resultStr => {
-          const dashIndex = resultStr.indexOf(' - ');
+          const dashIndex = resultStr.lastIndexOf(' - ');
+
+          console.log('resultStr', dashIndex)
           if (dashIndex > 0) {
+            console.log('asadad', dashIndex)
             const year = resultStr.substring(0, dashIndex);
             const text = resultStr.substring(dashIndex + 3);
-            if (/^\d{4}$/.test(year)) {
-              return { year, text };
-            }
+            return { year: year ?? '', text: text ?? '' };
           }
           return { year: '', text: resultStr };
         });
-        
+
         setForm({
           identification: {
             ...report.identification,
@@ -251,7 +253,7 @@ export default function Editor() {
           conclusion: report.conclusion || "",
           recommendations: report.recommendations || []
         });
-        
+
         setIsSaved(true);
         console.log('Form updated with report data');
       } else {
@@ -273,7 +275,7 @@ export default function Editor() {
   // Save preview visibility to localStorage when it changes (only after initial load)
   createEffect(() => {
     if (!previewLoaded()) return; // Don't save until we've loaded the initial preference
-    
+
     try {
       localStorage.setItem('audiometry-preview-visible', String(showPreview()));
     } catch (error) {
@@ -289,7 +291,7 @@ export default function Editor() {
     }
 
     const formData = form();
-    
+
     // Validate required field: name
     if (!formData.identification.name || formData.identification.name.trim() === '') {
       toast.error('Nome é obrigatório para salvar o relatório');
@@ -297,15 +299,15 @@ export default function Editor() {
     }
 
     setIsSaving(true);
-    
+
     const reportId = currentReportId();
-    
+
     // Save complete report to IndexedDB
     // Convert structured results to string[] for storage
     const resultsAsStrings = formData.results
       .map(r => `${r.year.trim()} - ${r.text.trim()}`.trim())
       .filter(s => s && s !== '-'); // Remove empty or lone hyphens
-    
+
     const report: Report = {
       id: reportId || undefined,
       identification: formData.identification,
@@ -318,20 +320,20 @@ export default function Editor() {
 
     try {
       const savedReportId = await dbService.saveReport(report);
-      
+
       // If this was a new report, update URL, state, and count
       if (!reportId) {
         setCurrentReportId(savedReportId);
         navigate(`/form?reportId=${savedReportId}`, { replace: true });
-        
+
         // Update total count and IDs
         const count = await dbService.getReportsCount();
         setTotalReports(count);
-        
+
         const ids = await dbService.getAllReportIds();
         setAllReportIds(ids);
       }
-      
+
       setIsSaved(true);
       toast.success("Relatório salvo com sucesso!");
     } catch (error) {
@@ -348,12 +350,12 @@ export default function Editor() {
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     // Adjust age if birthday hasn't occurred yet this year
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
+
     return age;
   };
 
@@ -363,12 +365,12 @@ export default function Editor() {
       const updates: Partial<FormData['identification']> = {
         [field]: value
       };
-      
+
       // If birth_date is being updated, automatically calculate age
       if (field === 'birth_date' && value instanceof Date) {
         updates.age = calculateAge(value);
       }
-      
+
       return {
         ...prev,
         identification: {
@@ -402,10 +404,10 @@ export default function Editor() {
     setForm((prev) => {
       const currentArray = prev[field] || [];
       const exists = currentArray.includes(option);
-      
+
       return {
         ...prev,
-        [field]: exists 
+        [field]: exists
           ? currentArray.filter(item => item !== option)
           : [...currentArray, option]
       };
@@ -416,7 +418,7 @@ export default function Editor() {
   // Handle custom text input for "Other" option
   const handleAddCustomOption = (field: 'history' | 'recommendations', value: string) => {
     if (!value.trim()) return;
-    
+
     setForm((prev) => {
       const currentArray = prev[field] || [];
       return {
@@ -466,93 +468,19 @@ export default function Editor() {
   const handleUpdateYearResult = (index: number, year: string, text: string) => {
     setForm((prev) => ({
       ...prev,
-      results: prev.results.map((item, i) => 
+      results: prev.results.map((item, i) =>
         i === index ? { year, text } : item
       )
     }));
     setIsSaved(false);
   };
 
-  // Format functions for each section
-  const formatIdentification = (data: FormData['identification']) => {
-    const formatDate = (date: Date) => {
-      return date instanceof Date && !isNaN(date.getTime())
-        ? date.toLocaleDateString('pt-BR')
-        : '';
-    };
-    
-    const lines = IDENTIFICATION_FIELDS.map(field => {
-      const value = data[field.key as keyof typeof data];
-      let formattedValue: string;
-      
-      if (field.type === 'date' && value instanceof Date) {
-        formattedValue = formatDate(value);
-      } else if (field.type === 'number') {
-        formattedValue = `${value}${field.key === 'age' ? ' anos' : ''}`;
-      } else {
-        formattedValue = String(value);
-      }
-      
-      const label = field.reportLabel || field.label;
-      return `- **${label}**: ${formattedValue};`;
-    });
-    
-    return `## 1. Identificação\n\n${lines.join('\n')}`;
-  };
 
-  const formatHistory = (history: string[]) => {
-    const content = history.length ? history.join('\n\n') : '';
-    return `## 2. Histórico
-
-${content}`;
-  };
-
-  const formatResults = (results: ResultEntry[]) => {
-    let content = '';
-    if (results.length) {
-      const formattedResults = results.map(r => {
-        if (r.year && r.text) {
-          return `**${r.year}** - ${r.text}`;
-        } else if (r.text) {
-          return r.text;
-        }
-        return '';
-      }).filter(Boolean);
-      content = formattedResults.join('\n');
-    }
-    return `## 3. Resultado / Evolutivo Audiométrico (avaliação cronológica)
-
-${content}`;
-  };
-
-  const formatConclusion = (conclusion: string) => {
-    return `## 4. Conclusão
-
-${conclusion}`;
-  };
-
-  const formatRecommendations = (recommendations: string[]) => {
-    const content = recommendations.length 
-      ? recommendations.map(rec => `- ${rec};`).join('\n')
-      : '';
-    return `## 5. Recomendações
-
-${content}`;
-  };
 
   // Main function to render form into template
   const renderTemplate = () => {
-    const formData = form();
-    const sections = [
-      '# Relatório Evolutivo Audiométrico\n',
-      formatIdentification(formData.identification),
-      formatHistory(formData.history),
-      formatResults(formData.results),
-      formatConclusion(formData.conclusion),
-      formatRecommendations(formData.recommendations)
-    ];
-
-    const formattedContent = sections.join('\n\n');
+    const reportData = formAsReport();
+    const formattedContent = formatReportContent(reportData as Report);
     setContent(formattedContent);
     return formattedContent;
   };
@@ -567,22 +495,22 @@ ${content}`;
   const canGoPrevious = () => {
     const currentId = currentReportId();
     if (!currentId) return false;
-    
+
     const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
     const ids = allReportIds();
     const currentIndex = ids.indexOf(idNum);
-    
+
     return currentIndex > 0;
   };
 
   const canGoNext = () => {
     const currentId = currentReportId();
     if (!currentId) return false;
-    
+
     const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
     const ids = allReportIds();
     const currentIndex = ids.indexOf(idNum);
-    
+
     return currentIndex >= 0 && currentIndex < ids.length - 1;
   };
 
@@ -591,13 +519,13 @@ ${content}`;
       console.log('Cannot go to previous report (already at first)');
       return;
     }
-    
+
     const currentId = currentReportId();
     const idNum = typeof currentId === 'string' ? parseInt(currentId as string) : currentId!;
     const ids = allReportIds();
     const currentIndex = ids.indexOf(idNum);
     const previousId = ids[currentIndex - 1];
-    
+
     console.log(`Navigating from report ${idNum} (index ${currentIndex}) to ${previousId} (index ${currentIndex - 1})`);
     navigate(`/form?reportId=${previousId}`);
   };
@@ -607,13 +535,13 @@ ${content}`;
       console.log(`Cannot go to next report (already at last, total: ${totalReports()})`);
       return;
     }
-    
+
     const currentId = currentReportId();
     const idNum = typeof currentId === 'string' ? parseInt(currentId as string) : currentId!;
     const ids = allReportIds();
     const currentIndex = ids.indexOf(idNum);
     const nextId = ids[currentIndex + 1];
-    
+
     console.log(`Navigating from report ${idNum} (index ${currentIndex}) to ${nextId} (index ${currentIndex + 1})`);
     navigate(`/form?reportId=${nextId}`);
   };
@@ -624,7 +552,7 @@ ${content}`;
     const resultsAsStrings = formData.results
       .map(r => `${r.year.trim()} - ${r.text.trim()}`.trim())
       .filter(s => s && s !== '-');
-    
+
     return {
       identification: formData.identification,
       history: formData.history,
@@ -646,12 +574,14 @@ ${content}`;
       toast.loading("Gerando PDF...", { id: 'pdf-download' });
 
       const currentSettings = settings();
-      const markdownContent = content();
+      // Use the content directly from state, which is already formatted via renderTemplate/formatReportContent
+      // Or explicitly format again to be sure
+      const markdownContent = formatReportContent(formAsReport() as Report);
       const patientName = form().identification.name || 'Paciente';
       const filename = `Relatório Audiométrico - ${patientName}.pdf`;
 
       await generatePDF(markdownContent, currentSettings, filename);
-      
+
       toast.success("PDF baixado com sucesso!", { id: 'pdf-download' });
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -667,12 +597,12 @@ ${content}`;
 
     try {
       const formData = form();
-      
+
       // Convert structured results to string[] for CSV export
       const resultsAsStrings = formData.results
         .map(r => `${r.year.trim()} - ${r.text.trim()}`.trim())
         .filter(s => s && s !== '-');
-      
+
       const report: Partial<Report> = {
         identification: formData.identification,
         history: formData.history,
@@ -680,10 +610,10 @@ ${content}`;
         conclusion: formData.conclusion,
         recommendations: formData.recommendations
       };
-      
+
       // Get CSV fields configuration for identification
       const csvFields = getCSVFields();
-      
+
       // Create CSV header - identification fields + report fields
       const headers = [
         ...csvFields.map(field => field.csvColumns[0]),
@@ -693,7 +623,7 @@ ${content}`;
         'recommendations'
       ];
       const csvHeader = headers.join(',');
-      
+
       // Helper to escape CSV values
       const escapeCSV = (value: string) => {
         if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -701,11 +631,11 @@ ${content}`;
         }
         return value;
       };
-      
+
       // Identification fields
       const identificationValues = csvFields.map(field => {
         const value = report.identification?.[field.key as keyof typeof report.identification];
-        
+
         // Format dates as DD/MM/YYYY
         if (field.type === 'date' && value) {
           const date = new Date(value);
@@ -714,22 +644,22 @@ ${content}`;
           const year = date.getFullYear();
           return `${day}/${month}/${year}`;
         }
-        
+
         return escapeCSV(String(value || ''));
       });
-      
+
       // History - join with semicolon
       const history = report.history ? report.history.join('; ') : '';
-      
+
       // Results - join with semicolon
       const results = report.results ? report.results.join('; ') : '';
-      
+
       // Conclusion
       const conclusion = report.conclusion || '';
-      
+
       // Recommendations - join with semicolon
       const recommendations = report.recommendations ? report.recommendations.join('; ') : '';
-      
+
       // Create CSV row
       const csvRow = [
         ...identificationValues,
@@ -738,24 +668,24 @@ ${content}`;
         escapeCSV(conclusion),
         escapeCSV(recommendations)
       ].join(',');
-      
+
       // Combine header and row
       const csvContent = [csvHeader, csvRow].join('\n');
-      
+
       // Create blob and download
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
-      
+
       const patientName = report.identification?.name || 'Paciente';
       link.setAttribute('href', url);
       link.setAttribute('download', `Relatório Audiométrico - ${patientName}.csv`);
       link.style.visibility = 'hidden';
-      
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast.success("CSV baixado com sucesso!");
     } catch (error) {
       console.error("Error generating CSV:", error);
@@ -765,62 +695,62 @@ ${content}`;
 
   return (
     <div class="form-wrapper" classList={{ "preview-hidden": !showPreview() }}>
-        <Show when={isLoadingReport()}>
-          <div class="loading-indicator">
-            <div class="spinner"></div>
-          </div>
-        </Show>
-        
-        <div class="form-header">
-          <div class="header-top">
-            <div class="header-title">
-              <h2>{form().identification.name || "Novo Relatório"}</h2>
-              <div class="status-badges">
-                <Show when={currentReportId()}>
-                  <span class="save-status" classList={{ 
-                    "status-saved": isSaved(), 
-                    "status-pending": !isSaved(),
-                    "status-saving": isSaving()
-                  }}>
-                    {isSaving() ? "⏳ Salvando..." : isSaved() ? "✓ Salvo" : "● Não salvo"}
-                  </span>
-                </Show>
-                <Show when={currentReportId()}>
-                  <span class="completion-status" classList={{
-                    "status-complete": !!isReportComplete(formAsReport() as Report),
-                    "status-incomplete": !isReportComplete(formAsReport() as Report)
-                  }}>
-                    {isReportComplete(formAsReport() as Report) ? "📋 Completo" : "📝 Incompleto"}
-                  </span>
-                </Show>
-              </div>
-            </div>
-            <div class="form-actions">
-              <button type="button" onClick={() => setShowPreview(!showPreview())} title="Toggle Preview">
-                {showPreview() ? "👁️ Ocultar Preview" : "👁️ Mostrar Preview"}
-              </button>
+      <Show when={isLoadingReport()}>
+        <div class="loading-indicator">
+          <div class="spinner"></div>
+        </div>
+      </Show>
+
+      <div class="form-header">
+        <div class="header-top">
+          <div class="header-title">
+            <h2>{form().identification.name || "Novo Relatório"}</h2>
+            <div class="status-badges">
               <Show when={currentReportId()}>
-                <button type="button" onClick={handleDownloadPDF} title="Download PDF">
-                  📄 PDF
-                </button>
-                <button type="button" onClick={handleDownloadCSV} title="Download CSV">
-                  📥 CSV
-                </button>
+                <span class="save-status" classList={{
+                  "status-saved": isSaved(),
+                  "status-pending": !isSaved(),
+                  "status-saving": isSaving()
+                }}>
+                  {isSaving() ? "⏳ Salvando..." : isSaved() ? "✓ Salvo" : "● Não salvo"}
+                </span>
               </Show>
-              <button type="button" onClick={handleSaveForm} title="Salvar (Ctrl/Cmd + S)">
-                💾 Salvar
-              </button>
+              <Show when={currentReportId()}>
+                <span class="completion-status" classList={{
+                  "status-complete": !!isReportComplete(formAsReport() as Report),
+                  "status-incomplete": !isReportComplete(formAsReport() as Report)
+                }}>
+                  {isReportComplete(formAsReport() as Report) ? "📋 Completo" : "📝 Incompleto"}
+                </span>
+              </Show>
             </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" onClick={() => setShowPreview(!showPreview())} title="Toggle Preview">
+              {showPreview() ? "👁️ Ocultar Preview" : "👁️ Mostrar Preview"}
+            </button>
+            <Show when={currentReportId()}>
+              <button type="button" onClick={handleDownloadPDF} title="Download PDF">
+                📄 PDF
+              </button>
+              <button type="button" onClick={handleDownloadCSV} title="Download CSV">
+                📥 CSV
+              </button>
+            </Show>
+            <button type="button" onClick={handleSaveForm} title="Salvar (Ctrl/Cmd + S)">
+              💾 Salvar
+            </button>
           </div>
         </div>
+      </div>
 
-        <div class="content-area">
-          <div class="form-container">
-            <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
+      <div class="content-area">
+        <div class="form-container">
+          <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
             <div class="form-grid">
               {/* Item 1 */}
               <div class="form-grid-item">
-                <IdentificationSection 
+                <IdentificationSection
                   identification={() => form().identification}
                   onUpdate={handleUpdateIdentification}
                 />
@@ -828,7 +758,7 @@ ${content}`;
 
               {/* Item 2 */}
               <div class="form-grid-item">
-                <HistorySection 
+                <HistorySection
                   history={() => form().history}
                   predefinedOptions={HISTORY_OPTIONS}
                   isOptionSelected={(option) => isOptionSelected('history', option)}
@@ -841,7 +771,7 @@ ${content}`;
 
               {/* Item 3 */}
               <div class="form-grid-item">
-                <ResultsSection 
+                <ResultsSection
                   results={() => form().results}
                   predefinedOptions={RESULTS_OPTIONS}
                   onAdd={handleAddYearResult}
@@ -852,7 +782,7 @@ ${content}`;
 
               {/* Item 4 */}
               <div class="form-grid-item">
-                <ConclusionSection 
+                <ConclusionSection
                   conclusion={() => form().conclusion}
                   onUpdate={(value) => handleUpdateField('conclusion', value)}
                 />
@@ -860,7 +790,7 @@ ${content}`;
 
               {/* Item 5 */}
               <div class="form-grid-item">
-                <RecommendationsSection 
+                <RecommendationsSection
                   recommendations={() => form().recommendations}
                   predefinedOptions={RECOMMENDATIONS_OPTIONS}
                   isOptionSelected={(option) => isOptionSelected('recommendations', option)}
@@ -882,46 +812,46 @@ ${content}`;
       </div>
 
       <Show when={currentReportId()}>
-          <div class="patient-navigation-bottom">
-            <button 
-              type="button" 
-              onClick={() => navigate('/patients')}
-              class="btn-back-to-list"
-              title="Voltar para lista de pacientes"
+        <div class="patient-navigation-bottom">
+          <button
+            type="button"
+            onClick={() => navigate('/patients')}
+            class="btn-back-to-list"
+            title="Voltar para lista de pacientes"
+          >
+            📋 Lista de Pacientes
+          </button>
+          <div class="navigation-controls">
+            <button
+              type="button"
+              onClick={goToPreviousReport}
+              disabled={!canGoPrevious()}
+              title="Relatório Anterior (Ctrl/Cmd + ←)"
             >
-              📋 Lista de Pacientes
+              ⬅️ Anterior
             </button>
-            <div class="navigation-controls">
-              <button 
-                type="button" 
-                onClick={goToPreviousReport}
-                disabled={!canGoPrevious()}
-                title="Relatório Anterior (Ctrl/Cmd + ←)"
-              >
-                ⬅️ Anterior
-              </button>
-              <span class="patient-counter">
-                {(() => {
-                  const currentId = currentReportId();
-                  if (!currentId) return '';
-                  const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
-                  const ids = allReportIds();
-                  const currentIndex = ids.indexOf(idNum);
-                  if (currentIndex === -1) return `ID ${currentId} de ${totalReports()}`;
-                  return `${currentIndex + 1} de ${totalReports()}`;
-                })()}
-              </span>
-              <button 
-                type="button" 
-                onClick={goToNextReport}
-                disabled={!canGoNext()}
-                title="Próximo Relatório (Ctrl/Cmd + →)"
-              >
-                Próximo ➡️
-              </button>
-            </div>
+            <span class="patient-counter">
+              {(() => {
+                const currentId = currentReportId();
+                if (!currentId) return '';
+                const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
+                const ids = allReportIds();
+                const currentIndex = ids.indexOf(idNum);
+                if (currentIndex === -1) return `ID ${currentId} de ${totalReports()}`;
+                return `${currentIndex + 1} de ${totalReports()}`;
+              })()}
+            </span>
+            <button
+              type="button"
+              onClick={goToNextReport}
+              disabled={!canGoNext()}
+              title="Próximo Relatório (Ctrl/Cmd + →)"
+            >
+              Próximo ➡️
+            </button>
           </div>
-        </Show>
+        </div>
+      </Show>
     </div>
   );
 }
