@@ -14,6 +14,8 @@ type Props = {
   onExportCSV: () => void;
   onExportPDFs: () => void;
   onClearAll: () => void;
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
 };
 
 export default function ReportsTable(props: Props) {
@@ -21,6 +23,31 @@ export default function ReportsTable(props: Props) {
   const [sortDirection, setSortDirection] = createSignal<SortDirection>('asc');
   const [currentPage, setCurrentPage] = createSignal(1);
   const itemsPerPage = 20;
+
+  const isAllSelected = () => {
+    return props.reports.length > 0 && props.reports.every(r => props.selectedIds.includes(String(r.id)));
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    const currentIds = new Set(props.selectedIds);
+    const reportIds = props.reports.map(r => String(r.id));
+
+    if (checked) {
+      const newIds = Array.from(new Set([...currentIds, ...reportIds]));
+      props.onSelectionChange(newIds);
+    } else {
+      const newIds = props.selectedIds.filter(id => !reportIds.includes(id));
+      props.onSelectionChange(newIds);
+    }
+  };
+
+  const handleSelectRow = (id: string, checked: boolean) => {
+    if (checked) {
+      props.onSelectionChange([...props.selectedIds, id]);
+    } else {
+      props.onSelectionChange(props.selectedIds.filter(sid => sid !== id));
+    }
+  };
 
   const handleSort = (field: SortField | 'id') => {
     if (sortField() === field) {
@@ -35,7 +62,7 @@ export default function ReportsTable(props: Props) {
     const reports = [...props.reports];
     const field = sortField();
     const direction = sortDirection();
-    
+
     // Special case for ID sorting
     if (field === 'id') {
       reports.sort((a, b) => {
@@ -45,7 +72,7 @@ export default function ReportsTable(props: Props) {
       });
       return reports;
     }
-    
+
     const fieldConfig = getFieldConfig(field);
 
     reports.sort((a, b) => {
@@ -98,16 +125,16 @@ export default function ReportsTable(props: Props) {
       for (let i = 1; i <= total; i++) pages.push(i);
     } else {
       pages.push(1);
-      
+
       if (current > 3) pages.push(-1); // Ellipsis
-      
+
       const start = Math.max(2, current - 1);
       const end = Math.min(total - 1, current + 1);
-      
+
       for (let i = start; i <= end; i++) pages.push(i);
-      
+
       if (current < total - 2) pages.push(-1); // Ellipsis
-      
+
       pages.push(total);
     }
 
@@ -127,25 +154,25 @@ export default function ReportsTable(props: Props) {
         <div class="table-header">
           <span class="table-count">Total: {props.totalCount} relatório(s)</span>
           <div class="table-actions">
-            <button 
-              type="button" 
-              class="btn-export-csv" 
+            <button
+              type="button"
+              class="btn-export-csv"
               onClick={props.onExportCSV}
               title="Exportar todos os relatórios para CSV"
             >
               📥 Exportar CSV
             </button>
-            <button 
-              type="button" 
-              class="btn-export-pdf" 
+            <button
+              type="button"
+              class="btn-export-pdf"
               onClick={props.onExportPDFs}
-              title="Exportar todos os relatórios como PDF"
+              title={props.selectedIds.length > 0 ? "Exportar relatórios selecionados" : "Exportar todos os relatórios completos como PDF"}
             >
-              📄 Exportar PDFs
+              📄 {props.selectedIds.length > 0 ? `Exportar Selecionados (${props.selectedIds.length})` : "Exportar PDFs"}
             </button>
-            <button 
-              type="button" 
-              class="btn-clear-all" 
+            <button
+              type="button"
+              class="btn-clear-all"
               onClick={props.onClearAll}
               title="Limpar todos os dados"
             >
@@ -153,11 +180,19 @@ export default function ReportsTable(props: Props) {
             </button>
           </div>
         </div>
-        
+
         <div class="table-container">
           <table class="reports-table">
             <thead>
               <tr>
+                <th class="checkbox-col">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected()}
+                    onChange={(e) => handleSelectAll(e.currentTarget.checked)}
+                    title="Selecionar todos os relatórios visíveis"
+                  />
+                </th>
                 <th onClick={() => handleSort('id')} class="sortable">
                   ID {getSortIcon('id')}
                 </th>
@@ -176,17 +211,24 @@ export default function ReportsTable(props: Props) {
               <For each={paginatedReports()}>
                 {(report, index) => (
                   <tr onClick={() => props.onReportClick(String(report.id))}>
+                    <td onClick={(e) => e.stopPropagation()} class="checkbox-col">
+                      <input
+                        type="checkbox"
+                        checked={props.selectedIds.includes(String(report.id))}
+                        onChange={(e) => handleSelectRow(String(report.id), e.currentTarget.checked)}
+                      />
+                    </td>
                     <td>{report.id}</td>
                     <For each={sortableFields}>
                       {(field) => {
                         const value = report.identification[field.key as keyof typeof report.identification];
                         const isNameField = field.key === 'name';
                         return (
-                          <td 
+                          <td
                             onClick={isNameField ? (e) => e.stopPropagation() : undefined}
                             style={isNameField ? { cursor: 'text' } : undefined}
                           >
-                            {field.type === 'date' 
+                            {field.type === 'date'
                               ? new Date(value as Date).toLocaleDateString('pt-BR')
                               : String(value)
                             }
@@ -238,7 +280,7 @@ export default function ReportsTable(props: Props) {
           <div class="pagination-info">
             Mostrando {((currentPage() - 1) * itemsPerPage) + 1} - {Math.min(currentPage() * itemsPerPage, props.reports.length)} de {props.reports.length} relatórios
           </div>
-          
+
           <div class="pagination-controls">
             <button
               onClick={() => goToPage(currentPage() - 1)}

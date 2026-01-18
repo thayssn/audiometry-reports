@@ -13,12 +13,12 @@ export function markdownToHTML(markdown: string): string {
     .replace(/^- (.+?);$/gm, '<li>$1</li>')
     .replace(/\n\n/g, '<br><br>')
     .replace(/\n/g, '<br>');
-  
+
   // Wrap consecutive <li> items in <ul> tags
   html = html.replace(/(<li>.*?<\/li>(?:<br>)?)+/g, (match) => {
     return '<ul>' + match.replace(/<br>/g, '') + '</ul>';
   });
-  
+
   return html;
 }
 
@@ -49,9 +49,9 @@ export function createPDFContainer(
   tempContainer.style.fontSize = '11pt';
   tempContainer.style.lineHeight = '1.4';
   tempContainer.style.color = '#000000';
-  
+
   const styledContent = applyPDFStyles(htmlContent);
-  
+
   tempContainer.innerHTML = `
     <div style="text-align: center; margin-bottom: 0.5cm; page-break-inside: avoid;">
       <img src="${settings.logoUrl}" style="max-width: 50mm; height: auto;" />
@@ -65,7 +65,7 @@ export function createPDFContainer(
       <p style="margin: 0; font-size: 10pt;">${settings.signatureCRFa}</p>
     </div>
   `;
-  
+
   return tempContainer;
 }
 
@@ -83,9 +83,9 @@ export async function generatePDF(
 ): Promise<void> {
   const htmlContent = markdownToHTML(markdownContent);
   const tempContainer = createPDFContainer(htmlContent, settings);
-  
+
   const pdf = new jsPDF('p', 'mm', 'a4');
-  
+
   return new Promise((resolve, reject) => {
     pdf.html(tempContainer, {
       callback: function (doc) {
@@ -118,13 +118,13 @@ export async function generateMultiplePDFs(
   for (let i = 0; i < markdownContents.length; i++) {
     const content = markdownContents[i];
     const filename = filenames[i];
-    
+
     await generatePDF(content, settings, filename);
-    
+
     if (onProgress) {
       onProgress(i + 1, markdownContents.length);
     }
-    
+
     // Small delay between downloads to prevent browser blocking
     if (i < markdownContents.length - 1) {
       await new Promise(resolve => setTimeout(resolve, 500));

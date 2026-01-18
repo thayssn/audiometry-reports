@@ -13,6 +13,7 @@ export default function Reports() {
   const navigate = useNavigate();
   const [reports, setReports] = createSignal<Report[]>([]);
   const [filteredReports, setFilteredReports] = createSignal<Report[]>([]);
+  const [selectedIds, setSelectedIds] = createSignal<string[]>([]);
   const [isLoading, setIsLoading] = createSignal(true);
   const [settings, setSettings] = createSignal<AppSettings>(DEFAULT_SETTINGS);
 
@@ -80,7 +81,7 @@ export default function Reports() {
   const handleDeleteReport = async (reportId: string) => {
     const report = reports().find(r => String(r.id) === reportId);
     const reportName = report?.identification.name || `ID ${reportId}`;
-    
+
     const confirmed = window.confirm(
       `Deseja realmente deletar o relatório?\n\n${reportName}\n\nEsta ação não pode ser desfeita.`
     );
@@ -90,6 +91,7 @@ export default function Reports() {
     try {
       await dbService.deleteReport(reportId);
       toast.success("Relatório deletado com sucesso!");
+      setSelectedIds(prev => prev.filter(id => id !== reportId));
       await loadReports();
     } catch (error) {
       console.error("Error deleting report:", error);
@@ -105,9 +107,9 @@ export default function Reports() {
       const bNum = typeof b === 'string' ? parseInt(b) : (b || 0);
       return aNum - bNum;
     });
-    
+
     console.log('Current report IDs in database:', reportIds);
-    
+
     const confirmed = window.confirm(
       `⚠️ ATENÇÃO!\n\nEsta ação irá apagar TODOS os relatórios do sistema.\n\nTotal de relatórios: ${reports().length}\nIDs: ${reportIds.slice(0, 10).join(', ')}${reportIds.length > 10 ? '...' : ''}\n\nDeseja realmente continuar?`
     );
@@ -126,6 +128,7 @@ export default function Reports() {
       await dbService.clearAllData();
       setReports([]);
       setFilteredReports([]);
+      setSelectedIds([]);
       toast.success("Todos os dados foram removidos com sucesso! Próximos IDs começarão de 1.");
     } catch (error) {
       console.error("Error clearing data:", error);
@@ -138,7 +141,7 @@ export default function Reports() {
   const handleExportCSV = () => {
     try {
       const allReports = reports();
-      
+
       if (allReports.length === 0) {
         toast.error("Nenhum relatório para exportar");
         return;
@@ -146,7 +149,7 @@ export default function Reports() {
 
       // Get CSV fields configuration for identification
       const csvFields = getCSVFields();
-      
+
       // Create CSV header - identification fields + report fields
       const headers = [
         ...csvFields.map(field => field.csvColumns[0]),
@@ -156,7 +159,7 @@ export default function Reports() {
         'recommendations'
       ];
       const csvHeader = headers.join(',');
-      
+
       // Helper to escape CSV values
       const escapeCSV = (value: string) => {
         if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -164,13 +167,13 @@ export default function Reports() {
         }
         return value;
       };
-      
+
       // Create CSV rows
       const csvRows = allReports.map(report => {
         // Identification fields
         const identificationValues = csvFields.map(field => {
           const value = report.identification[field.key as keyof typeof report.identification];
-          
+
           // Format dates as DD/MM/YYYY
           if (field.type === 'date' && value) {
             const date = new Date(value);
@@ -179,22 +182,22 @@ export default function Reports() {
             const year = date.getFullYear();
             return `${day}/${month}/${year}`;
           }
-          
+
           return escapeCSV(String(value || ''));
         });
-        
+
         // History - join with semicolon
         const history = report.history ? report.history.join('; ') : '';
-        
+
         // Results - join with semicolon (now simple strings)
         const results = report.results ? report.results.join('; ') : '';
-        
+
         // Conclusion
         const conclusion = report.conclusion || '';
-        
+
         // Recommendations - join with semicolon
         const recommendations = report.recommendations ? report.recommendations.join('; ') : '';
-        
+
         return [
           ...identificationValues,
           escapeCSV(history),
@@ -203,23 +206,23 @@ export default function Reports() {
           escapeCSV(recommendations)
         ].join(',');
       });
-      
+
       // Combine header and rows
       const csvContent = [csvHeader, ...csvRows].join('\n');
-      
+
       // Create blob and download
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
-      
+
       link.setAttribute('href', url);
       link.setAttribute('download', `Relatórios Audiométricos - Todos.csv`);
       link.style.visibility = 'hidden';
-      
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast.success(`${allReports.length} relatórios exportados com sucesso!`);
     } catch (error) {
       console.error("Error exporting CSV:", error);
@@ -229,28 +232,27 @@ export default function Reports() {
 
   const handleExportPDFs = async () => {
     const allReports = reports();
-    
-    if (allReports.length === 0) {
+    const currentSelection = selectedIds();
+    const isSelectionMode = currentSelection.length > 0;
+
+    // Determine target reports
+    const targetReports = isSelectionMode
+      ? allReports.filter(r => currentSelection.includes(String(r.id)))
+      : allReports;
+
+    if (targetReports.length === 0) {
       toast.error("Nenhum relatório para exportar");
       return;
     }
 
-    // Filtrar apenas relatórios completos (com conclusão)
-    const completeReports = allReports.filter(r => isReportComplete(r));
-    
-    if (completeReports.length === 0) {
-      toast.error("Nenhum relatório completo para exportar");
-      return;
+    // Confirm only for mass export (not selection mode) or if large number
+    if (!isSelectionMode && targetReports.length > 5) {
+      const message = `Encontrados ${targetReports.length} relatórios.\n\nDeseja exportar todos como PDF?\n\nEsta operação pode levar alguns minutos.`;
+      if (!window.confirm(message)) return;
     }
 
-    const confirmed = window.confirm(
-      `Encontrados ${completeReports.length} relatórios completos (de ${allReports.length} totais).\n\nDeseja exportar os ${completeReports.length} relatórios completos como PDF?\n\nEsta operação pode levar alguns minutos.`
-    );
-
-    if (!confirmed) return;
-
     try {
-      toast.success(`Iniciando exportação de ${completeReports.length} PDFs...`);
+      toast.success(`Iniciando exportação de ${targetReports.length} PDFs...`);
 
       // Helper to format report content as markdown
       const formatReportContent = (report: Report): string => {
@@ -271,28 +273,28 @@ export default function Reports() {
           `**Data do Último Exame Sequencial:** ${formatDate(report.identification.last_sequential_exam_date)}\n` +
           `**Cargo:** ${report.identification.position}\n` +
           `**Setor:** ${report.identification.department}\n`,
-          
+
           report.history && report.history.length > 0
             ? `## 2. Histórico\n\n${report.history.map(h => `- ${h}`).join('\n')}\n`
             : '',
-          
+
           report.results && report.results.length > 0
             ? `## 3. Resultados\n\n${report.results.map(r => {
-                // Make year (before " - ") bold
-                const dashIndex = r.indexOf(' - ');
-                if (dashIndex > 0) {
-                  const year = r.substring(0, dashIndex);
-                  const text = r.substring(dashIndex + 3);
-                  return `**${year}** - ${text}`;
-                }
-                return r;
-              }).join('\n\n')}\n`
+              // Make year (before " - ") bold
+              const dashIndex = r.indexOf(' - ');
+              if (dashIndex > 0) {
+                const year = r.substring(0, dashIndex);
+                const text = r.substring(dashIndex + 3);
+                return `**${year}** - ${text}`;
+              }
+              return r;
+            }).join('\n\n')}\n`
             : '',
-          
+
           report.conclusion
             ? `## 4. Conclusão\n\n${report.conclusion}\n`
             : '',
-          
+
           report.recommendations && report.recommendations.length > 0
             ? `## 5. Recomendações\n\n${report.recommendations.map(r => `- ${r}`).join('\n')}\n`
             : ''
@@ -302,8 +304,8 @@ export default function Reports() {
       };
 
       // Prepare markdown contents and filenames
-      const markdownContents = completeReports.map(report => formatReportContent(report));
-      const filenames = completeReports.map(report => {
+      const markdownContents = targetReports.map(report => formatReportContent(report));
+      const filenames = targetReports.map(report => {
         const patientName = report.identification.name || 'Paciente';
         return `Relatório Audiométrico - ${patientName}.pdf`;
       });
@@ -314,13 +316,12 @@ export default function Reports() {
         settings(),
         filenames,
         (current, total) => {
-          // Optional: Could show progress toast here if needed
-          console.log(`Generated ${current}/${total} PDFs`);
+          // Progress update
         }
       );
 
-      toast.success(`${completeReports.length} PDFs exportados com sucesso!`);
-      
+      toast.success(`${targetReports.length} PDFs exportados com sucesso!`);
+
     } catch (error) {
       console.error("Error exporting PDFs:", error);
       toast.error("Erro ao exportar PDFs!");
@@ -347,6 +348,8 @@ export default function Reports() {
             onExportCSV={handleExportCSV}
             onExportPDFs={handleExportPDFs}
             onClearAll={handleClearAllData}
+            selectedIds={selectedIds()}
+            onSelectionChange={setSelectedIds}
           />
         </>
       )}
