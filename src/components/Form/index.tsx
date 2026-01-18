@@ -229,11 +229,8 @@ export default function Editor() {
       if (report) {
         // Convert string[] results to structured format
         const structuredResults = (report.results || []).map(resultStr => {
-          const dashIndex = resultStr.lastIndexOf(' - ');
-
-          console.log('resultStr', dashIndex)
+          const dashIndex = resultStr.indexOf(' - ');
           if (dashIndex > 0) {
-            console.log('asadad', dashIndex)
             const year = resultStr.substring(0, dashIndex);
             const text = resultStr.substring(dashIndex + 3);
             return { year: year ?? '', text: text ?? '' };
