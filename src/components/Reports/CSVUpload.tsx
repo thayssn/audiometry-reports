@@ -270,6 +270,7 @@ export default function CSVUpload(props: Props) {
       console.error('Import error:', error);
       toast.error(error instanceof Error ? error.message : 'Erro ao importar relatórios');
     } finally {
+      setClearExisting(false);
       setIsLoading(false);
     }
   };
@@ -291,7 +292,8 @@ export default function CSVUpload(props: Props) {
             {file() ? file()!.name : 'Selecionar arquivo CSV'}
           </label>
         </div>
-
+      </div>
+      <div>
         <Show when={file()}>
           <div class="upload-options">
             <label class="checkbox-label">
@@ -300,7 +302,7 @@ export default function CSVUpload(props: Props) {
                 checked={clearExisting()}
                 onChange={(e) => setClearExisting(e.currentTarget.checked)}
               />
-              <span>Limpar dados existentes antes de importar</span>
+              <span>Limpar dados existentes antes de importar</span><br />{clearExisting() ? <b class="danger">🚨 Dados apagados permanentemente</b> : null}
             </label>
           </div>
 

@@ -1,7 +1,17 @@
-import { A } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
+import { authService } from "~/services/authService";
+import { dbService } from "~/services/dbService";
 import "./Header.scss";
 
 export default function Header() {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    dbService.clearLocalCache();
+    await authService.signOut();
+    navigate("/login");
+  };
+
   return (
     <header class="app-header">
       <div class="header-content">
@@ -18,6 +28,19 @@ export default function Header() {
           <A href="/settings" class="nav-link" activeClass="active">
             ⚙️ Configurações
           </A>
+          <button
+            onClick={handleLogout}
+            class="nav-link"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              "font-size": "inherit",
+              "font-family": "inherit"
+            }}
+          >
+            Sair
+          </button>
         </nav>
       </div>
     </header>

@@ -28,12 +28,21 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
         }
     }
 
@@ -203,13 +212,25 @@
                 font-weight: 700;
             }
 
+            .id {
+                display: inline-block;
+                padding: 0.3rem 0.5rem;
+                margin: 0;
+                font-size: 0.5em;
+                border-radius: 8px;
+                background: #efefef;
+                color: #aaa;
+                font-family: monospace;
+            }
+
             .status-badges {
                 display: flex;
                 gap: 0.5rem;
                 align-items: center;
             }
 
-            .save-status, .completion-status {
+            .save-status,
+            .completion-status {
                 padding: 0.5rem 1rem;
                 border-radius: 20px;
                 font-size: 0.875rem;
@@ -281,11 +302,11 @@
         padding: 0.5em;
     }
 
-    form{
-        
+    form {
+
         @media print {
             & {
-              display: none !important;
+                display: none !important;
             }
         }
 
@@ -306,7 +327,7 @@
                 padding-bottom: 0.5rem;
             }
 
-            > div {
+            >div {
                 margin-bottom: 1rem;
 
                 &:last-child {
@@ -331,7 +352,7 @@
                 border-radius: 4px;
                 font-size: 0.95rem;
                 font-family: inherit;
-                
+
                 &:focus {
                     outline: none;
                     border-color: var(--color-background-light);
@@ -383,7 +404,7 @@
             border-radius: 4px;
             font-size: 0.95rem;
             font-family: inherit;
-            
+
             &:focus {
                 outline: none;
                 border-color: var(--color-background-light);
@@ -427,7 +448,7 @@
                 cursor: pointer;
                 flex-shrink: 0;
 
-                &:checked + span {
+                &:checked+span {
                     font-weight: 600;
                 }
             }
@@ -658,7 +679,7 @@
                 font-size: 0.95rem;
                 background: var(--color-background-lightest);
                 flex-shrink: 0;
-                
+
                 &:focus {
                     outline: none;
                     border-color: var(--color);
@@ -673,7 +694,7 @@
                 border-radius: 4px;
                 font-size: 0.95rem;
                 background: var(--color-background-lightest);
-                
+
                 &:focus {
                     outline: none;
                     border-color: var(--color);
@@ -684,7 +705,7 @@
                 &::-webkit-calendar-picker-indicator {
                     cursor: pointer;
                     opacity: 0.6;
-                    
+
                     &:hover {
                         opacity: 1;
                     }
@@ -789,4 +810,3 @@
         }
     }
 }
-  

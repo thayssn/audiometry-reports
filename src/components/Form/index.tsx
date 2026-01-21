@@ -701,6 +701,7 @@ export default function Editor() {
       <div class="form-header">
         <div class="header-top">
           <div class="header-title">
+            <Show when={currentReportId()}><p class="id">{currentReportId()}</p></Show>
             <h2>{form().identification.name || "Novo Relatório"}</h2>
             <div class="status-badges">
               <Show when={currentReportId()}>

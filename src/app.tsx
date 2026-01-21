@@ -2,6 +2,7 @@ import { Router } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
 import { Suspense } from "solid-js";
 import { Toaster } from "solid-toast";
+import AuthGuard from "./components/AuthGuard";
 import "./app.css";
 
 export default function App() {
@@ -9,8 +10,8 @@ export default function App() {
     <Router
       root={(props) => (
         <main>
-          <Toaster 
-            position="top-center" 
+          <Toaster
+            position="top-center"
             toastOptions={{
               duration: 3000,
               style: {
@@ -21,7 +22,9 @@ export default function App() {
               'z-index': '9999',
             }}
           />
-          <Suspense>{props.children}</Suspense>
+          <AuthGuard>
+            <Suspense>{props.children}</Suspense>
+          </AuthGuard>
         </main>
       )}
     >

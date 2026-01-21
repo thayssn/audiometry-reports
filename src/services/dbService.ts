@@ -1,10 +1,9 @@
-// IndexedDB Service for managing audiometric reports
 
-const DB_NAME = 'audiometric-reports';
-const DB_VERSION = 6; // Incremented to simplify results from YearResult[] to string[]
-const REPORTS_STORE = 'reports';
-const SETTINGS_STORE = 'settings';
+import { supabase } from './supabase';
+import { authService } from './authService';
+import toast from 'solid-toast';
 
+// Keep types compatible with existing code
 export type YearResult = {
   year: string;
   result: string;
@@ -22,8 +21,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   signatureCRFa: 'CRFa2 - 12.876'
 };
 
-// IMPORTANT: When adding identification fields, update src/config/fields.ts first
-// Then sync this identification structure with the config
 export type Report = {
   id?: string | number;
   identification: {
@@ -36,326 +33,346 @@ export type Report = {
     department: string;
   };
   history: string[];
-  results: string[]; // Simplified: "2023 - Texto do resultado"
+  results: string[];
   conclusion: string;
   recommendations: string[];
   created_at?: string;
   updated_at: string;
+  created_by?: string;
 };
 
-// Helper function to check if a report is complete
 export const isReportComplete = (report: Report): boolean => {
-  // Check identification fields
   if (!report.identification.name || report.identification.name.trim() === '') return false;
   if (!report.identification.position || report.identification.position.trim() === '') return false;
   if (!report.identification.department || report.identification.department.trim() === '') return false;
-  
-  // Check if has at least one history item
   if (!report.history || report.history.length === 0) return false;
-  
-  // Check if has at least one result
   if (!report.results || report.results.length === 0) return false;
-  
-  // Check conclusion
   if (!report.conclusion || report.conclusion.trim() === '') return false;
-  
-  // Check if has at least one recommendation
   if (!report.recommendations || report.recommendations.length === 0) return false;
-  
   return true;
 };
 
 class DBService {
-  private db: IDBDatabase | null = null;
-  private initPromise: Promise<void> | null = null;
+  // In-memory cache
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+  // Init is now mostly a check for auth
   async init(): Promise<void> {
-    if (this.db) return;
-    if (this.initPromise) return this.initPromise;
-
-    this.initPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-      request.onerror = () => reject(request.error);
-      
-      request.onsuccess = () => {
-        this.db = request.result;
-        resolve();
-      };
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-
-        // Remove old patients store if it exists
-        if (db.objectStoreNames.contains('patients')) {
-          db.deleteObjectStore('patients');
-        }
-
-        // Create or recreate reports store
-        if (db.objectStoreNames.contains(REPORTS_STORE)) {
-          db.deleteObjectStore(REPORTS_STORE);
-        }
-        
-        const reportsStore = db.createObjectStore(REPORTS_STORE, { keyPath: 'id', autoIncrement: true });
-        reportsStore.createIndex('name', ['identification', 'name'], { unique: false });
-        reportsStore.createIndex('created_at', 'created_at', { unique: false });
-        reportsStore.createIndex('updated_at', 'updated_at', { unique: false });
-
-        // Create settings store
-        if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
-          db.createObjectStore(SETTINGS_STORE, { keyPath: 'id' });
-        }
-      };
-    });
-
-    return this.initPromise;
+    const user = await authService.getCurrentUser();
+    if (!user) {
+      console.warn("DBService: No authenticated user found.");
+    }
   }
 
-  // CRUD Relatórios
-  async saveReport(report: Report): Promise<number> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+  // --- Cache Helpers ---
+  private getFromCache<T>(key: string): T | null {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([REPORTS_STORE], 'readwrite');
-      const store = transaction.objectStore(REPORTS_STORE);
-      
-      const reportToSave = {
-        ...report,
-        created_at: report.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+    const now = Date.now();
+    if (now - cached.timestamp > this.CACHE_TTL) {
+      this.cache.delete(key);
+      return null;
+    }
 
-      let request: IDBRequest;
-      
-      if (report.id) {
-        // Update existing report - convert to number
-        const id = typeof report.id === 'string' ? parseInt(report.id as string) : report.id;
-        reportToSave.id = id;
-        request = store.put(reportToSave);
-      } else {
-        // Create new report - remove undefined id field
-        const { id, ...reportWithoutId } = reportToSave;
-        request = store.add(reportWithoutId);
+    return cached.data as T;
+  }
+
+  private setCache(key: string, data: any): void {
+    this.cache.set(key, { data, timestamp: Date.now() });
+  }
+
+  private invalidateCache(keyPrefix: string): void {
+    if (keyPrefix) {
+      this.cache.delete(keyPrefix);
+    }
+
+    // Always clear list cache on any update to ensure consistency
+    this.cache.forEach((_, key) => {
+      if (key.startsWith('reports_list') || key.startsWith('reports_count')) {
+        this.cache.delete(key);
       }
-
-      request.onsuccess = () => resolve(request.result as number);
-      request.onerror = () => reject(request.error);
     });
+  }
+
+  // Public method to clear cache (e.g. on logout)
+  clearLocalCache(): void {
+    this.cache.clear();
+  }
+
+  // --- Reports CRUD ---
+
+  async saveReport(report: Report): Promise<number> {
+    const user = await authService.getCurrentUser();
+    if (!user) throw new Error('User must be logged in to save reports');
+
+    // Prepare data for Supabase
+    // Separate ID from data
+    const { id, ...reportData } = report;
+
+    const dbPayload = {
+      created_by: user.id,
+      identification: report.identification,
+      history: report.history,
+      results: report.results,
+      conclusion: report.conclusion,
+      recommendations: report.recommendations,
+      updated_at: new Date().toISOString()
+    };
+
+    if (report.created_at) {
+      // @ts-ignore
+      dbPayload.created_at = report.created_at;
+    }
+
+    let result;
+    if (id) {
+      // Update
+      const { data, error } = await supabase
+        .from('reports')
+        .update(dbPayload)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      result = data;
+    } else {
+      // Insert
+      const { data, error } = await supabase
+        .from('reports')
+        .insert(dbPayload)
+        .select()
+        .single();
+
+      if (error) throw error;
+      result = data;
+    }
+
+    // Invalidate Cache for this specific report
+    this.invalidateCache(`report_${result.id}`);
+
+    return result.id;
   }
 
   async getReport(reportId: string | number): Promise<Report | null> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+    // Check Cache
+    const cacheKey = `report_${reportId}`;
+    const cached = this.getFromCache<Report>(cacheKey);
+    if (cached) {
+      toast.success("Relatório carregado do cache", {
+        duration: 500,
+      }); // Toast notification
+      return cached;
+    }
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([REPORTS_STORE], 'readonly');
-      const store = transaction.objectStore(REPORTS_STORE);
-      // Convert string to number if needed since autoIncrement uses numbers
-      const id = typeof reportId === 'string' ? parseInt(reportId) : reportId;
-      const request = store.get(id);
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .eq('id', reportId)
+      .single();
 
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
+    if (error) {
+      console.error("Error fetching report:", error);
+      return null;
+    }
+
+    if (!data) return null;
+
+    const report = this.mapSupabaseReportToApp(data);
+
+    // Set Cache
+    this.setCache(cacheKey, report);
+
+    return report;
   }
 
   async updateReport(reportId: string | number, report: Report): Promise<void> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([REPORTS_STORE], 'readwrite');
-      const store = transaction.objectStore(REPORTS_STORE);
-      
-      // Convert string to number if needed
-      const id = typeof reportId === 'string' ? parseInt(reportId) : reportId;
-      
-      const reportToUpdate = {
-        ...report,
-        id: id,
-        updated_at: new Date().toISOString()
-      };
-
-      const request = store.put(reportToUpdate);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+    // wrapper for saveReport
+    const reportToSave = { ...report, id: reportId };
+    await this.saveReport(reportToSave);
   }
 
   async deleteReport(reportId: string | number): Promise<void> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+    const { error } = await supabase
+      .from('reports')
+      .delete()
+      .eq('id', reportId);
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([REPORTS_STORE], 'readwrite');
-      const store = transaction.objectStore(REPORTS_STORE);
-      // Convert string to number if needed
-      const id = typeof reportId === 'string' ? parseInt(reportId) : reportId;
-      const request = store.delete(id);
+    if (error) throw error;
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+    // Invalidate Cache
+    this.invalidateCache(`report_${reportId}`);
   }
 
   async getAllReports(): Promise<Report[]> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+    const user = await authService.getCurrentUser();
+    if (!user) return [];
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([REPORTS_STORE], 'readonly');
-      const store = transaction.objectStore(REPORTS_STORE);
-      const request = store.getAll();
+    // Check Cache
+    const cacheKey = `reports_list_${user.id}`;
+    const cached = this.getFromCache<Report[]>(cacheKey);
+    if (cached) return cached;
 
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .eq('created_by', user.id) // FILTER BY USER
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching all reports:", error);
+      return [];
+    }
+
+    const reports = data.map(val => this.mapSupabaseReportToApp(val));
+
+    // Set Cache
+    this.setCache(cacheKey, reports);
+
+    return reports;
   }
 
   async getReportsCount(): Promise<number> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+    const user = await authService.getCurrentUser();
+    if (!user) return 0;
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([REPORTS_STORE], 'readonly');
-      const store = transaction.objectStore(REPORTS_STORE);
-      const request = store.count();
+    const cacheKey = `reports_count_${user.id}`;
+    const cached = this.getFromCache<number>(cacheKey);
+    if (cached !== null) return cached;
 
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    const { count, error } = await supabase
+      .from('reports')
+      .select('*', { count: 'exact', head: true })
+      .eq('created_by', user.id); // FILTER BY USER
+
+    if (error) return 0;
+    const finalCount = count || 0;
+
+    this.setCache(cacheKey, finalCount);
+    return finalCount;
   }
 
   async getAllReportIds(): Promise<number[]> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+    const user = await authService.getCurrentUser();
+    if (!user) return [];
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([REPORTS_STORE], 'readonly');
-      const store = transaction.objectStore(REPORTS_STORE);
-      const request = store.getAllKeys();
+    const { data, error } = await supabase
+      .from('reports')
+      .select('id')
+      .eq('created_by', user.id) // FILTER BY USER
+      .order('id', { ascending: true });
 
-      request.onsuccess = () => {
-        const ids = (request.result as number[]).sort((a, b) => a - b);
-        resolve(ids);
-      };
-      request.onerror = () => reject(request.error);
-    });
+    if (error) return [];
+    return data.map(r => r.id);
   }
 
   async addReports(reports: Report[]): Promise<void> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+    // Batch insert
+    const user = await authService.getCurrentUser();
+    if (!user) throw new Error('User not logged in');
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([REPORTS_STORE], 'readwrite');
-      const store = transaction.objectStore(REPORTS_STORE);
+    const payload = reports.map(r => ({
+      created_by: user.id,
+      identification: r.identification,
+      history: r.history,
+      results: r.results,
+      conclusion: r.conclusion,
+      recommendations: r.recommendations,
+      created_at: r.created_at,
+      updated_at: r.updated_at
+    }));
 
-      reports.forEach(report => {
-        const reportToAdd = {
-          ...report,
-          created_at: report.created_at || new Date().toISOString(),
-          updated_at: report.updated_at || new Date().toISOString()
-        };
-        const { id, ...reportWithoutId } = reportToAdd;
-        store.add(reportWithoutId);
-      });
+    const { error } = await supabase
+      .from('reports')
+      .insert(payload);
 
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
+    if (error) throw error;
+
+    // Invalidate lists
+    this.invalidateCache('');
   }
 
   async clearAllData(): Promise<void> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+    console.warn("clearAllData called - deleting all reports for this user");
+    const { error } = await supabase.from('reports').delete().gt('id', 0);
+    if (error) throw error;
 
-    // Save current settings before clearing
-    const currentSettings = await this.getSettings();
-    
-    // Close any existing connection first
-    if (this.db) {
-      this.db.close();
-      this.db = null;
-      this.initPromise = null;
-    }
-
-    // Delete the entire database to reset autoIncrement
-    return new Promise((resolve, reject) => {
-      console.log('Attempting to delete database:', DB_NAME);
-      const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-      
-      deleteRequest.onsuccess = async () => {
-        console.log('✅ Database deleted successfully! AutoIncrement counter reset.');
-        // Reinitialize the database (creates a fresh one)
-        try {
-          await this.init();
-          console.log('✅ Fresh database initialized. Next ID will be 1.');
-          
-          // Restore settings
-          await this.saveSettings(currentSettings);
-          console.log('✅ Settings restored.');
-          
-          resolve();
-        } catch (error) {
-          reject(error);
-        }
-      };
-      
-      deleteRequest.onerror = (event) => {
-        console.error('❌ Database deletion failed:', event);
-        reject(deleteRequest.error);
-      };
-      
-      deleteRequest.onblocked = (event) => {
-        console.error('⚠️ Database deletion BLOCKED! There are open connections.');
-        console.error('This usually means the database is open in another tab or window.');
-        console.error('Please close all other tabs with this app and try again.');
-        
-        // Reject instead of trying to continue with a corrupted state
-        reject(new Error('Database deletion blocked. Please close all other tabs with this app and try again.'));
-      };
-    });
+    this.cache.clear();
   }
 
-  // Settings CRUD
+
+  // --- Settings CRUD ---
+  // Now merged into 'profiles' table
+
   async getSettings(): Promise<AppSettings> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+    const user = await authService.getCurrentUser();
+    if (!user) return DEFAULT_SETTINGS;
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([SETTINGS_STORE], 'readonly');
-      const store = transaction.objectStore(SETTINGS_STORE);
-      const request = store.get('app-settings');
+    const cacheKey = `settings_${user.id}`;
+    const cached = this.getFromCache<AppSettings>(cacheKey);
+    if (cached) return cached;
 
-      request.onsuccess = () => {
-        const settings = request.result;
-        resolve(settings || DEFAULT_SETTINGS);
-      };
-      request.onerror = () => reject(request.error);
-    });
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name, crfa, logo_url')
+      .eq('id', user.id)
+      .single();
+
+    const settings = {
+      logoUrl: profile?.logo_url || DEFAULT_SETTINGS.logoUrl,
+      signatureName: profile?.name || DEFAULT_SETTINGS.signatureName,
+      signatureCRFa: profile?.crfa || DEFAULT_SETTINGS.signatureCRFa
+    };
+
+    this.setCache(cacheKey, settings);
+    return settings;
   }
 
   async saveSettings(settings: AppSettings): Promise<void> {
-    await this.init();
-    if (!this.db) throw new Error('Database not initialized');
+    const user = await authService.getCurrentUser();
+    if (!user) throw new Error('User not logged in');
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([SETTINGS_STORE], 'readwrite');
-      const store = transaction.objectStore(SETTINGS_STORE);
-      const settingsToSave = {
-        id: 'app-settings',
-        ...settings
-      };
-      const request = store.put(settingsToSave);
-
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+    // Update Profile (Name, CRFa, Logo)
+    const { error } = await authService.updateProfile(user.id, {
+      name: settings.signatureName,
+      crfa: settings.signatureCRFa,
+      logo_url: settings.logoUrl
     });
+
+    if (error) throw error;
+
+    this.invalidateCache(`settings_${user.id}`);
+  }
+
+  // Helper to map Supabase structure to App structure
+  private mapSupabaseReportToApp(data: any): Report {
+    const identification = data.identification || {};
+
+    // Convert date strings back to Date objects
+    if (identification.birth_date && typeof identification.birth_date === 'string') {
+      identification.birth_date = new Date(identification.birth_date);
+    }
+    if (identification.admission_date && typeof identification.admission_date === 'string') {
+      identification.admission_date = new Date(identification.admission_date);
+    }
+    if (identification.last_sequential_exam_date && typeof identification.last_sequential_exam_date === 'string') {
+      identification.last_sequential_exam_date = new Date(identification.last_sequential_exam_date);
+    }
+
+    return {
+      id: data.id,
+      identification: identification,
+      history: data.history,
+      results: data.results,
+      conclusion: data.conclusion,
+      recommendations: data.recommendations,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      created_by: data.created_by
+    };
   }
 }
 
 export const dbService = new DBService();
-
