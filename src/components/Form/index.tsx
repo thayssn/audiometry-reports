@@ -90,7 +90,7 @@ export default function Editor() {
   // Start with false to match SSR, then load from localStorage on client
   const [showPreview, setShowPreview] = createSignal(false);
   const [currentReportId, setCurrentReportId] = createSignal<string | number | null>(null);
-  const [isLoadingReport, setIsLoadingReport] = createSignal(false);
+  const [isLoadingReport, setIsLoadingReport] = createSignal(!!searchParams.reportId);
   const [totalReports, setTotalReports] = createSignal(0);
   const [allReportIds, setAllReportIds] = createSignal<number[]>([]);
   const [isSaved, setIsSaved] = createSignal(false);
@@ -698,157 +698,159 @@ export default function Editor() {
         </div>
       </Show>
 
-      <div class="form-header">
-        <div class="header-top">
-          <div class="header-title">
-            <Show when={currentReportId()}><p class="id">{currentReportId()}</p></Show>
-            <h2>{form().identification.name || "Novo Relatório"}</h2>
-            <div class="status-badges">
-              <Show when={currentReportId()}>
-                <span class="save-status" classList={{
-                  "status-saved": isSaved(),
-                  "status-pending": !isSaved(),
-                  "status-saving": isSaving()
-                }}>
-                  {isSaving() ? "⏳ Salvando..." : isSaved() ? "✓ Salvo" : "● Não salvo"}
-                </span>
-              </Show>
-              <Show when={currentReportId()}>
-                <span class="completion-status" classList={{
-                  "status-complete": !!isReportComplete(formAsReport() as Report),
-                  "status-incomplete": !isReportComplete(formAsReport() as Report)
-                }}>
-                  {isReportComplete(formAsReport() as Report) ? "📋 Completo" : "📝 Incompleto"}
-                </span>
-              </Show>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button type="button" onClick={() => setShowPreview(!showPreview())} title="Toggle Preview">
-              {showPreview() ? "👁️ Ocultar Preview" : "👁️ Mostrar Preview"}
-            </button>
-            <Show when={currentReportId()}>
-              <button type="button" onClick={handleDownloadPDF} title="Download PDF">
-                📄 PDF
-              </button>
-              <button type="button" onClick={handleDownloadCSV} title="Download CSV">
-                📥 CSV
-              </button>
-            </Show>
-            <button type="button" onClick={handleSaveForm} title="Salvar (Ctrl/Cmd + S)">
-              💾 Salvar
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="content-area">
-        <div class="form-container">
-          <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
-            <div class="form-grid">
-              {/* Item 1 */}
-              <div class="form-grid-item">
-                <IdentificationSection
-                  identification={() => form().identification}
-                  onUpdate={handleUpdateIdentification}
-                />
-              </div>
-
-              {/* Item 2 */}
-              <div class="form-grid-item">
-                <HistorySection
-                  history={() => form().history}
-                  predefinedOptions={HISTORY_OPTIONS}
-                  isOptionSelected={(option) => isOptionSelected('history', option)}
-                  onToggleOption={(option) => handleToggleOption('history', option)}
-                  onRemoveCustomOption={(option) => handleRemoveCustomOption('history', option)}
-                  getCustomOptions={() => getCustomOptions('history', HISTORY_OPTIONS)}
-                  onAddCustomOption={(value) => handleAddCustomOption('history', value)}
-                />
-              </div>
-
-              {/* Item 3 */}
-              <div class="form-grid-item">
-                <ResultsSection
-                  results={() => form().results}
-                  predefinedOptions={RESULTS_OPTIONS}
-                  onAdd={handleAddYearResult}
-                  onRemove={handleRemoveYearResult}
-                  onUpdate={handleUpdateYearResult}
-                />
-              </div>
-
-              {/* Item 4 */}
-              <div class="form-grid-item">
-                <ConclusionSection
-                  conclusion={() => form().conclusion}
-                  onUpdate={(value) => handleUpdateField('conclusion', value)}
-                />
-              </div>
-
-              {/* Item 5 */}
-              <div class="form-grid-item">
-                <RecommendationsSection
-                  recommendations={() => form().recommendations}
-                  predefinedOptions={RECOMMENDATIONS_OPTIONS}
-                  isOptionSelected={(option) => isOptionSelected('recommendations', option)}
-                  onToggleOption={(option) => handleToggleOption('recommendations', option)}
-                  onRemoveCustomOption={(option) => handleRemoveCustomOption('recommendations', option)}
-                  getCustomOptions={() => getCustomOptions('recommendations', RECOMMENDATIONS_OPTIONS)}
-                  onAddCustomOption={(value) => handleAddCustomOption('recommendations', value)}
-                />
+      <Show when={!isLoadingReport()}>
+        <div class="form-header">
+          <div class="header-top">
+            <div class="header-title">
+              <Show when={currentReportId()}><p class="id">{currentReportId()}</p></Show>
+              <h2>{form().identification.name || "Novo Relatório"}</h2>
+              <div class="status-badges">
+                <Show when={currentReportId()}>
+                  <span class="save-status" classList={{
+                    "status-saved": isSaved(),
+                    "status-pending": !isSaved(),
+                    "status-saving": isSaving()
+                  }}>
+                    {isSaving() ? "⏳ Salvando..." : isSaved() ? "✓ Salvo" : "● Não salvo"}
+                  </span>
+                </Show>
+                <Show when={currentReportId()}>
+                  <span class="completion-status" classList={{
+                    "status-complete": !!isReportComplete(formAsReport() as Report),
+                    "status-incomplete": !isReportComplete(formAsReport() as Report)
+                  }}>
+                    {isReportComplete(formAsReport() as Report) ? "📋 Completo" : "📝 Incompleto"}
+                  </span>
+                </Show>
               </div>
             </div>
-          </form>
-        </div>
-
-        {showPreview() && (
-          <div class="preview-container">
-            <RenderMarkdown content={content} />
-          </div>
-        )}
-      </div>
-
-      <Show when={currentReportId()}>
-        <div class="patient-navigation-bottom">
-          <button
-            type="button"
-            onClick={() => navigate('/patients')}
-            class="btn-back-to-list"
-            title="Voltar para lista de pacientes"
-          >
-            📋 Lista de Pacientes
-          </button>
-          <div class="navigation-controls">
-            <button
-              type="button"
-              onClick={goToPreviousReport}
-              disabled={!canGoPrevious()}
-              title="Relatório Anterior (Ctrl/Cmd + ←)"
-            >
-              ⬅️ Anterior
-            </button>
-            <span class="patient-counter">
-              {(() => {
-                const currentId = currentReportId();
-                if (!currentId) return '';
-                const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
-                const ids = allReportIds();
-                const currentIndex = ids.indexOf(idNum);
-                if (currentIndex === -1) return `ID ${currentId} de ${totalReports()}`;
-                return `${currentIndex + 1} de ${totalReports()}`;
-              })()}
-            </span>
-            <button
-              type="button"
-              onClick={goToNextReport}
-              disabled={!canGoNext()}
-              title="Próximo Relatório (Ctrl/Cmd + →)"
-            >
-              Próximo ➡️
-            </button>
+            <div class="form-actions">
+              <button type="button" onClick={() => setShowPreview(!showPreview())} title="Toggle Preview">
+                {showPreview() ? "👁️ Ocultar Preview" : "👁️ Mostrar Preview"}
+              </button>
+              <Show when={currentReportId()}>
+                <button type="button" onClick={handleDownloadPDF} title="Download PDF">
+                  📄 PDF
+                </button>
+                <button type="button" onClick={handleDownloadCSV} title="Download CSV">
+                  📥 CSV
+                </button>
+              </Show>
+              <button type="button" onClick={handleSaveForm} title="Salvar (Ctrl/Cmd + S)">
+                💾 Salvar
+              </button>
+            </div>
           </div>
         </div>
+
+        <div class="content-area">
+          <div class="form-container">
+            <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
+              <div class="form-grid">
+                {/* Item 1 */}
+                <div class="form-grid-item">
+                  <IdentificationSection
+                    identification={() => form().identification}
+                    onUpdate={handleUpdateIdentification}
+                  />
+                </div>
+
+                {/* Item 2 */}
+                <div class="form-grid-item">
+                  <HistorySection
+                    history={() => form().history}
+                    predefinedOptions={HISTORY_OPTIONS}
+                    isOptionSelected={(option) => isOptionSelected('history', option)}
+                    onToggleOption={(option) => handleToggleOption('history', option)}
+                    onRemoveCustomOption={(option) => handleRemoveCustomOption('history', option)}
+                    getCustomOptions={() => getCustomOptions('history', HISTORY_OPTIONS)}
+                    onAddCustomOption={(value) => handleAddCustomOption('history', value)}
+                  />
+                </div>
+
+                {/* Item 3 */}
+                <div class="form-grid-item">
+                  <ResultsSection
+                    results={() => form().results}
+                    predefinedOptions={RESULTS_OPTIONS}
+                    onAdd={handleAddYearResult}
+                    onRemove={handleRemoveYearResult}
+                    onUpdate={handleUpdateYearResult}
+                  />
+                </div>
+
+                {/* Item 4 */}
+                <div class="form-grid-item">
+                  <ConclusionSection
+                    conclusion={() => form().conclusion}
+                    onUpdate={(value) => handleUpdateField('conclusion', value)}
+                  />
+                </div>
+
+                {/* Item 5 */}
+                <div class="form-grid-item">
+                  <RecommendationsSection
+                    recommendations={() => form().recommendations}
+                    predefinedOptions={RECOMMENDATIONS_OPTIONS}
+                    isOptionSelected={(option) => isOptionSelected('recommendations', option)}
+                    onToggleOption={(option) => handleToggleOption('recommendations', option)}
+                    onRemoveCustomOption={(option) => handleRemoveCustomOption('recommendations', option)}
+                    getCustomOptions={() => getCustomOptions('recommendations', RECOMMENDATIONS_OPTIONS)}
+                    onAddCustomOption={(value) => handleAddCustomOption('recommendations', value)}
+                  />
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {showPreview() && (
+            <div class="preview-container">
+              <RenderMarkdown content={content} />
+            </div>
+          )}
+        </div>
+
+        <Show when={currentReportId()}>
+          <div class="patient-navigation-bottom">
+            <button
+              type="button"
+              onClick={() => navigate('/patients')}
+              class="btn-back-to-list"
+              title="Voltar para lista de pacientes"
+            >
+              📋 Lista de Pacientes
+            </button>
+            <div class="navigation-controls">
+              <button
+                type="button"
+                onClick={goToPreviousReport}
+                disabled={!canGoPrevious()}
+                title="Relatório Anterior (Ctrl/Cmd + ←)"
+              >
+                ⬅️ Anterior
+              </button>
+              <span class="patient-counter">
+                {(() => {
+                  const currentId = currentReportId();
+                  if (!currentId) return '';
+                  const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
+                  const ids = allReportIds();
+                  const currentIndex = ids.indexOf(idNum);
+                  if (currentIndex === -1) return `ID ${currentId} de ${totalReports()}`;
+                  return `${currentIndex + 1} de ${totalReports()}`;
+                })()}
+              </span>
+              <button
+                type="button"
+                onClick={goToNextReport}
+                disabled={!canGoNext()}
+                title="Próximo Relatório (Ctrl/Cmd + →)"
+              >
+                Próximo ➡️
+              </button>
+            </div>
+          </div>
+        </Show>
       </Show>
     </div>
   );
