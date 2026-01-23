@@ -25,7 +25,7 @@ export const formatReportContent = (report: Report): string => {
             : '',
 
         report.results && report.results.length > 0
-            ? `## 3. Resultados\n\n${report.results.map(r => {
+            ? `## 3. Resultados / Evolutivo Audiométrico (Referencial / Sequencial)\n\n${report.results.map(r => {
                 // Make year (before " - ") bold
                 const dashIndex = r.indexOf(' - ');
                 if (dashIndex > 0) {
