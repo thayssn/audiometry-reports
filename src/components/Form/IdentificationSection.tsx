@@ -21,7 +21,7 @@ type Props = {
 export default function IdentificationSection(props: Props) {
     const getDateValue = (dateField: keyof IdentificationData) => {
         const date = props.identification()[dateField] as Date;
-        console.log(date);
+
         if (!date) return '';
 
         try {

@@ -11,6 +11,7 @@ import { dbService, Report, isReportComplete, AppSettings, DEFAULT_SETTINGS } fr
 import { getCSVFields } from "../../config/fields";
 import { generatePDF } from "../../utils/pdfGenerator";
 import { formatReportContent } from "../../utils/formatContent";
+import { formatDateUTC } from "../../utils/dateUtils";
 
 // IMPORTANT: When adding identification fields, update src/config/fields.ts first
 // Then sync this identification structure with the config
@@ -636,11 +637,7 @@ export default function Editor() {
 
         // Format dates as DD/MM/YYYY
         if (field.type === 'date' && value) {
-          const date = new Date(value);
-          const day = String(date.getDate()).padStart(2, '0');
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const year = date.getFullYear();
-          return `${day}/${month}/${year}`;
+          return formatDateUTC(value as Date);
         }
 
         return escapeCSV(String(value || ''));

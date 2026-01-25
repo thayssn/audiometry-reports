@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { Report, isReportComplete } from "../../services/dbService";
 import { getSortableFields, getFieldConfig } from "../../config/fields";
+import { formatDateUTC } from "../../utils/dateUtils";
 
 const sortableFields = getSortableFields();
 type SortField = typeof sortableFields[number]['key'];
@@ -229,7 +230,7 @@ export default function ReportsTable(props: Props) {
                             style={isNameField ? { cursor: 'text' } : undefined}
                           >
                             {field.type === 'date'
-                              ? new Date(value as Date).toLocaleDateString('pt-BR')
+                              ? formatDateUTC(value as Date)
                               : String(value)
                             }
                           </td>
