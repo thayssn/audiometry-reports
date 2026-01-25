@@ -6,8 +6,8 @@ import { getFieldLabel } from "../../config/fields";
 type IdentificationData = {
     name: string;
     age: number;
-    birth_date: Date;
-    admission_date: Date;
+    birth_date: Date | null;
+    admission_date: Date | null;
     last_sequential_exam_date: Date | null;
     position: string;
     department: string;
@@ -21,6 +21,7 @@ type Props = {
 export default function IdentificationSection(props: Props) {
     const getDateValue = (dateField: keyof IdentificationData) => {
         const date = props.identification()[dateField] as Date;
+        console.log(date);
         if (!date) return '';
 
         try {

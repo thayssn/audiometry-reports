@@ -90,10 +90,10 @@ export default function CSVUpload(props: Props) {
 
     const reports: Report[] = [];
 
-    // Helper to parse dates (returns current date if parsing fails)
-    const parseDate = (dateStr: string, fieldLabel: string, rowNum: number): Date => {
+    // Helper to parse dates (returns null if parsing fails or empty)
+    const parseDate = (dateStr: string, fieldLabel: string, rowNum: number): Date | null => {
       if (!dateStr || dateStr.trim() === '') {
-        return new Date();
+        return null;
       }
 
       try {
@@ -114,8 +114,8 @@ export default function CSVUpload(props: Props) {
         console.log(e)
       }
 
-      console.warn(`Linha ${rowNum}: ${fieldLabel} inválida "${dateStr}". Usando data atual.`);
-      return new Date();
+      console.warn(`Linha ${rowNum}: ${fieldLabel} inválida "${dateStr}". Usando vazio.`);
+      return null;
     };
 
     dataRows.forEach((values, index) => {
@@ -151,8 +151,8 @@ export default function CSVUpload(props: Props) {
       // if (ageStr && (isNaN(age) || age < 0 || age > 150)) { ... }
 
       // Parse dates if provided, otherwise use current date
-      const birthDate = birthDateStr ? parseDate(birthDateStr, getFieldLabel('birth_date'), rowNum) : new Date();
-      const admissionDate = admissionDateStr ? parseDate(admissionDateStr, getFieldLabel('admission_date'), rowNum) : new Date();
+      const birthDate = birthDateStr ? parseDate(birthDateStr, getFieldLabel('birth_date'), rowNum) : null;
+      const admissionDate = admissionDateStr ? parseDate(admissionDateStr, getFieldLabel('admission_date'), rowNum) : null;
 
       // Parse additional report fields
       const history = historyIdx !== -1 && values[historyIdx] ? values[historyIdx].split(';').map(s => s.trim()).filter(s => s) : [];
@@ -190,7 +190,7 @@ export default function CSVUpload(props: Props) {
           age,
           birth_date: birthDate,
           admission_date: admissionDate,
-          last_sequential_exam_date: new Date(),
+          last_sequential_exam_date: null,
           position,
           department
         },
@@ -345,10 +345,10 @@ export default function CSVUpload(props: Props) {
                       <td>{index() + 1}</td>
                       <td>{report.identification.name}</td>
                       <td>{report.identification.age}</td>
-                      <td>{new Date(report.identification.birth_date).toLocaleDateString('pt-BR')}</td>
+                      <td>{report.identification.birth_date ? new Date(report.identification.birth_date).toLocaleDateString('pt-BR') : ''}</td>
                       <td>{report.identification.position}</td>
                       <td>{report.identification.department}</td>
-                      <td>{new Date(report.identification.admission_date).toLocaleDateString('pt-BR')}</td>
+                      <td>{report.identification.admission_date ? new Date(report.identification.admission_date).toLocaleDateString('pt-BR') : ''}</td>
                     </tr>
                   )}
                 </For>

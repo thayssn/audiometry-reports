@@ -26,8 +26,8 @@ export type Report = {
   identification: {
     name: string;
     age: number;
-    birth_date: Date;
-    admission_date: Date;
+    birth_date: Date | null;
+    admission_date: Date | null;
     last_sequential_exam_date: Date | null;
     position: string;
     department: string;
@@ -43,6 +43,10 @@ export type Report = {
 
 export const isReportComplete = (report: Report): boolean => {
   if (!report.identification.name || report.identification.name.trim() === '') return false;
+  if (!report.identification.age || report.identification.age === 0) return false;
+  if (!report.identification.birth_date || report.identification.birth_date === null) return false;
+  if (!report.identification.admission_date || report.identification.admission_date === null) return false;
+  if (!report.identification.last_sequential_exam_date || report.identification.last_sequential_exam_date === null) return false;
   if (!report.identification.position || report.identification.position.trim() === '') return false;
   if (!report.identification.department || report.identification.department.trim() === '') return false;
   if (!report.history || report.history.length === 0) return false;

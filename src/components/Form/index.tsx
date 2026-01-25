@@ -8,7 +8,7 @@ import ResultsSection from "./ResultsSection";
 import ConclusionSection from "./ConclusionSection";
 import RecommendationsSection from "./RecommendationsSection";
 import { dbService, Report, isReportComplete, AppSettings, DEFAULT_SETTINGS } from "../../services/dbService";
-import { IDENTIFICATION_FIELDS, getFieldConfig, getCSVFields } from "../../config/fields";
+import { getCSVFields } from "../../config/fields";
 import { generatePDF } from "../../utils/pdfGenerator";
 import { formatReportContent } from "../../utils/formatContent";
 
@@ -23,8 +23,8 @@ type FormData = {
   identification: {
     name: string;
     age: number;
-    birth_date: Date;
-    admission_date: Date;
+    birth_date: Date | null;
+    admission_date: Date | null;
     last_sequential_exam_date: Date | null;
     position: string;
     department: string;
@@ -74,8 +74,8 @@ export default function Editor() {
     identification: {
       name: "",
       age: 0,
-      birth_date: new Date(),
-      admission_date: new Date(),
+      birth_date: null,
+      admission_date: null,
       last_sequential_exam_date: null,
       position: "",
       department: ""
@@ -199,9 +199,9 @@ export default function Editor() {
         identification: {
           name: "",
           age: 0,
-          birth_date: new Date(),
-          admission_date: new Date(),
-          last_sequential_exam_date: new Date(),
+          birth_date: null,
+          admission_date: null,
+          last_sequential_exam_date: null,
           position: "",
           department: ""
         },
@@ -241,8 +241,8 @@ export default function Editor() {
         setForm({
           identification: {
             ...report.identification,
-            birth_date: new Date(report.identification.birth_date),
-            admission_date: new Date(report.identification.admission_date),
+            birth_date: report.identification.birth_date ? new Date(report.identification.birth_date) : null,
+            admission_date: report.identification.admission_date ? new Date(report.identification.admission_date) : null,
             last_sequential_exam_date: report.identification.last_sequential_exam_date ? new Date(report.identification.last_sequential_exam_date) : null
           },
           history: report.history || [],
@@ -343,7 +343,8 @@ export default function Editor() {
 
 
   // Helper function to calculate age from birth date
-  const calculateAge = (birthDate: Date): number => {
+  const calculateAge = (birthDate: Date | null): number => {
+    if (!birthDate) return 0;
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
