@@ -25,7 +25,7 @@ type FormData = {
     age: number;
     birth_date: Date;
     admission_date: Date;
-    last_sequential_exam_date: Date;
+    last_sequential_exam_date: Date | null;
     position: string;
     department: string;
   };
@@ -76,7 +76,7 @@ export default function Editor() {
       age: 0,
       birth_date: new Date(),
       admission_date: new Date(),
-      last_sequential_exam_date: new Date(),
+      last_sequential_exam_date: null,
       position: "",
       department: ""
     },
@@ -243,7 +243,7 @@ export default function Editor() {
             ...report.identification,
             birth_date: new Date(report.identification.birth_date),
             admission_date: new Date(report.identification.admission_date),
-            last_sequential_exam_date: new Date(report.identification.last_sequential_exam_date)
+            last_sequential_exam_date: report.identification.last_sequential_exam_date ? new Date(report.identification.last_sequential_exam_date) : null
           },
           history: report.history || [],
           results: structuredResults,
@@ -357,7 +357,7 @@ export default function Editor() {
   };
 
   // Update form field handlers
-  const handleUpdateIdentification = (field: keyof FormData['identification'], value: string | number | Date) => {
+  const handleUpdateIdentification = (field: keyof FormData['identification'], value: string | number | Date | null) => {
     setForm((prev) => {
       const updates: Partial<FormData['identification']> = {
         [field]: value

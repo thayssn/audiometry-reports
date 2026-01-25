@@ -2,7 +2,8 @@ import { Report } from "../services/dbService";
 
 // Helper to format report content as markdown
 export const formatReportContent = (report: Report): string => {
-    const formatDate = (date: Date) => {
+    const formatDate = (date: Date | null | undefined) => {
+        if (!date) return '';
         const d = new Date(date);
         return d instanceof Date && !isNaN(d.getTime())
             ? d.toLocaleDateString('pt-BR')

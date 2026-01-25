@@ -28,7 +28,7 @@ export type Report = {
     age: number;
     birth_date: Date;
     admission_date: Date;
-    last_sequential_exam_date: Date;
+    last_sequential_exam_date: Date | null;
     position: string;
     department: string;
   };
@@ -195,10 +195,14 @@ class DBService {
   }
 
   async deleteReport(reportId: string | number): Promise<void> {
+    const user = await authService.getCurrentUser();
+    if (!user) throw new Error('User not logged in');
+
     const { error } = await supabase
       .from('reports')
       .delete()
-      .eq('id', reportId);
+      .eq('id', reportId)
+      .eq('created_by', user.id); // FILTER BY USER
 
     if (error) throw error;
 
@@ -296,7 +300,14 @@ class DBService {
 
   async clearAllData(): Promise<void> {
     console.warn("clearAllData called - deleting all reports for this user");
-    const { error } = await supabase.from('reports').delete().gt('id', 0);
+    const user = await authService.getCurrentUser();
+    if (!user) throw new Error('User not logged in');
+
+    const { error } = await supabase
+      .from('reports')
+      .delete()
+      .eq('created_by', user.id); // FILTER BY USER
+
     if (error) throw error;
 
     this.cache.clear();
