@@ -27,7 +27,7 @@ export function markdownToHTML(markdown: string): string {
  */
 export function applyPDFStyles(htmlContent: string): string {
   return htmlContent
-    .replace(/<h1>/g, '<h1 style="font-size: 19pt; font-weight: 700; margin: 1.4cm 0 -0.5cm 1cm; page-break-after: avoid;">')
+    .replace(/<h1>/g, '<h1 style="font-size: 19pt; font-weight: 700; margin: 1.4cm 0 0.5cm 0; text-align: center; page-break-after: avoid;">')
     .replace(/<h2>/g, '<h2 style="font-size: 14pt; font-weight: 700; margin: 0.6cm 0 0.25cm 1cm; page-break-after: avoid;">')
     .replace(/<h3>/g, '<h3 style="font-size: 12pt; font-weight: 700; margin: 0.4cm 0 0.2cm 1cm; page-break-after: avoid;">')
     .replace(/<strong>/g, '<strong style="font-weight: 700;">')
