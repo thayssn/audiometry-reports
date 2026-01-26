@@ -24,13 +24,27 @@ export const generateReportHTML = (report: Report): string => {
     // 1. Identificação
     html += `<div style="${STYLES.section}">`;
     html += `<h2 style="${STYLES.h2}">1. Identificação</h2>`;
-    html += `<p style="${STYLES.p}"><strong style="${STYLES.strong}">Nome:</strong> ${report.identification.name}</p>`;
-    html += `<p style="${STYLES.p}"><strong style="${STYLES.strong}">Idade:</strong> ${report.identification.age} anos</p>`;
-    html += `<p style="${STYLES.p}"><strong style="${STYLES.strong}">Data de Nascimento:</strong> ${formatDateUTC(report.identification.birth_date)}</p>`;
-    html += `<p style="${STYLES.p}"><strong style="${STYLES.strong}">Data de Admissão:</strong> ${formatDateUTC(report.identification.admission_date)}</p>`;
-    html += `<p style="${STYLES.p}"><strong style="${STYLES.strong}">Data do Último Exame Sequencial:</strong> ${formatDateUTC(report.identification.last_sequential_exam_date)}</p>`;
-    html += `<p style="${STYLES.p}"><strong style="${STYLES.strong}">Cargo:</strong> ${report.identification.position}</p>`;
-    html += `<p style="${STYLES.p}"><strong style="${STYLES.strong}">Setor:</strong> ${report.identification.department}</p>`;
+
+    // Format each field like results section
+    const identificationFields = [
+        { label: 'Nome', value: report.identification.name },
+        { label: 'Idade', value: `${report.identification.age} anos` },
+        { label: 'Data de Nascimento', value: formatDateUTC(report.identification.birth_date) },
+        { label: 'Data de Admissão', value: formatDateUTC(report.identification.admission_date) },
+        { label: 'Data do Último Exame Sequencial', value: formatDateUTC(report.identification.last_sequential_exam_date) },
+        { label: 'Cargo', value: report.identification.position },
+        { label: 'Setor', value: report.identification.department }
+    ];
+
+    identificationFields.forEach(field => {
+        html += `<div style="${STYLES.noBreak}">`;
+        html += `<p style="${STYLES.p} display: flex; align-items: baseline;">`;
+        html += `<strong style="${STYLES.strong} min-width: 0.5cm; flex-shrink: 0;">${field.label}</strong>`;
+        html += `<span style="margin-left: 0.1cm;">- ${field.value}</span>`;
+        html += `</p>`;
+        html += `</div>`;
+    });
+
     html += `</div>`;
 
     // 2. Histórico
