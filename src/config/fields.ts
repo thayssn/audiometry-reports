@@ -55,9 +55,9 @@ export const IDENTIFICATION_FIELDS: FieldConfig[] = [
     key: 'last_sequential_exam_date',
     type: 'date',
     label: 'Data do Último Exame Sequencial',
-    csvColumns: [],
-    inCSV: false,
-    sortable: false
+    csvColumns: ['last_sequential_exam_date', 'data_ultimo_exame', 'ultimo_exame'],
+    inCSV: true,
+    sortable: true
   },
   {
     key: 'position',

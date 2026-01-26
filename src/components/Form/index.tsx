@@ -11,6 +11,7 @@ import { dbService, Report, isReportComplete, AppSettings, DEFAULT_SETTINGS } fr
 import { getCSVFields } from "../../config/fields";
 import { generatePDF } from "../../utils/pdfGenerator";
 import { formatReportContent } from "../../utils/formatContent";
+import { generateReportHTML } from "../../utils/generateReportHTML";
 import { formatDateUTC } from "../../utils/dateUtils";
 
 // IMPORTANT: When adding identification fields, update src/config/fields.ts first
@@ -573,13 +574,12 @@ export default function Editor() {
       toast.loading("Gerando PDF...", { id: 'pdf-download' });
 
       const currentSettings = settings();
-      // Use the content directly from state, which is already formatted via renderTemplate/formatReportContent
-      // Or explicitly format again to be sure
-      const markdownContent = formatReportContent(formAsReport() as Report);
+      // Generate HTML directly for PDF
+      const htmlContent = generateReportHTML(formAsReport() as Report);
       const patientName = form().identification.name || 'Paciente';
       const filename = `Relatório Audiométrico - ${patientName}.pdf`;
 
-      await generatePDF(markdownContent, currentSettings, filename);
+      await generatePDF(htmlContent, currentSettings, filename);
 
       toast.success("PDF baixado com sucesso!", { id: 'pdf-download' });
     } catch (error) {

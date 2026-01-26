@@ -5,6 +5,8 @@ import { dbService, Report, isReportComplete, AppSettings, DEFAULT_SETTINGS } fr
 import { getCSVFields } from "../../config/fields";
 import { generateMultiplePDFs } from "../../utils/pdfGenerator";
 import { formatReportContent } from "../../utils/formatContent";
+import { generateReportHTML } from "../../utils/generateReportHTML";
+import { formatDateUTC } from "../../utils/dateUtils";
 import CSVUpload from "./CSVUpload";
 import FilterBar, { FilterCriteria } from "./FilterBar";
 import ReportsTable from "./ReportsTable";
@@ -177,11 +179,7 @@ export default function Reports() {
 
           // Format dates as DD/MM/YYYY
           if (field.type === 'date' && value) {
-            const date = new Date(value);
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = date.getFullYear();
-            return `${day}/${month}/${year}`;
+            return formatDateUTC(value as Date);
           }
 
           return escapeCSV(String(value || ''));
@@ -257,8 +255,8 @@ export default function Reports() {
 
 
 
-      // Prepare markdown contents and filenames
-      const markdownContents = targetReports.map(report => formatReportContent(report));
+      // Prepare HTML contents and filenames
+      const htmlContents = targetReports.map(report => generateReportHTML(report));
       const filenames = targetReports.map(report => {
         const patientName = report.identification.name || 'Paciente';
         return `Relatório Audiométrico - ${patientName}.pdf`;
@@ -266,7 +264,7 @@ export default function Reports() {
 
       // Use shared PDF generator utility for batch export
       await generateMultiplePDFs(
-        markdownContents,
+        htmlContents,
         settings(),
         filenames,
         (current, total) => {
