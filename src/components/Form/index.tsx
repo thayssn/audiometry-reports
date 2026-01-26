@@ -30,6 +30,7 @@ type FormData = {
     last_sequential_exam_date: Date | null;
     position: string;
     department: string;
+    base: string;
   };
   history: string[];
   results: ResultEntry[]; // Structured internally, converted to string[] on save
@@ -80,7 +81,8 @@ export default function Editor() {
       admission_date: null,
       last_sequential_exam_date: null,
       position: "",
-      department: ""
+      department: "",
+      base: ""
     },
     history: [],
     results: [],
@@ -205,7 +207,8 @@ export default function Editor() {
           admission_date: null,
           last_sequential_exam_date: null,
           position: "",
-          department: ""
+          department: "",
+          base: ""
         },
         history: [],
         results: [],
@@ -243,6 +246,7 @@ export default function Editor() {
         setForm({
           identification: {
             ...report.identification,
+            base: report.identification.base || "",
             birth_date: report.identification.birth_date ? new Date(report.identification.birth_date) : null,
             admission_date: report.identification.admission_date ? new Date(report.identification.admission_date) : null,
             last_sequential_exam_date: report.identification.last_sequential_exam_date ? new Date(report.identification.last_sequential_exam_date) : null

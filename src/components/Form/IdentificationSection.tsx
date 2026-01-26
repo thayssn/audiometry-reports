@@ -11,6 +11,7 @@ type IdentificationData = {
     last_sequential_exam_date: Date | null;
     position: string;
     department: string;
+    base?: string;
 };
 
 type Props = {
@@ -120,6 +121,17 @@ export default function IdentificationSection(props: Props) {
                         type="text"
                         value={props.identification().department}
                         onInput={(e) => props.onUpdate('department', e.currentTarget.value)}
+                    />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field-full">
+                    <label for="base">{getFieldLabel('base')}</label>
+                    <input
+                        id="base"
+                        type="text"
+                        value={props.identification().base || ''}
+                        onInput={(e) => props.onUpdate('base', e.currentTarget.value)}
                     />
                 </div>
             </div>

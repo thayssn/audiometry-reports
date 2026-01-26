@@ -78,6 +78,15 @@ export const IDENTIFICATION_FIELDS: FieldConfig[] = [
     sortable: true,
     filterable: true,
     reportLabel: 'Setor'
+  },
+  {
+    key: 'base',
+    type: 'text',
+    label: 'Base',
+    csvColumns: ['base', 'unidade', 'local'],
+    inCSV: true,
+    sortable: true,
+    filterable: true
   }
 ];
 

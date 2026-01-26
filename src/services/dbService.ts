@@ -31,6 +31,7 @@ export type Report = {
     last_sequential_exam_date: Date | null;
     position: string;
     department: string;
+    base?: string;
   };
   history: string[];
   results: string[];
@@ -49,6 +50,7 @@ export const isReportComplete = (report: Report): boolean => {
   if (!report.identification.last_sequential_exam_date || report.identification.last_sequential_exam_date === null) return false;
   if (!report.identification.position || report.identification.position.trim() === '') return false;
   if (!report.identification.department || report.identification.department.trim() === '') return false;
+
   if (!report.history || report.history.length === 0) return false;
   if (!report.results || report.results.length === 0) return false;
   if (!report.conclusion || report.conclusion.trim() === '') return false;
@@ -205,8 +207,7 @@ class DBService {
     const { error } = await supabase
       .from('reports')
       .delete()
-      .eq('id', reportId)
-      .eq('created_by', user.id); // FILTER BY USER
+      .eq('id', reportId);
 
     if (error) throw error;
 
@@ -219,22 +220,41 @@ class DBService {
     if (!user) return [];
 
     // Check Cache
-    const cacheKey = `reports_list_${user.id}`;
+    const cacheKey = `reports_list_global`;
     const cached = this.getFromCache<Report[]>(cacheKey);
     if (cached) return cached;
 
-    const { data, error } = await supabase
-      .from('reports')
-      .select('*')
-      .eq('created_by', user.id) // FILTER BY USER
-      .order('updated_at', { ascending: false });
+    let allReports: any[] = [];
+    let from = 0;
+    const step = 1000;
+    let keepFetching = true;
 
-    if (error) {
-      console.error("Error fetching all reports:", error);
-      return [];
+    while (keepFetching) {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .range(from, from + step - 1);
+
+      if (error) {
+        console.error("Error fetching all reports:", error);
+        return [];
+      }
+
+      if (data && data.length > 0) {
+        allReports = [...allReports, ...data];
+        // If we got fewer items than the step, we've reached the end
+        if (data.length < step) {
+          keepFetching = false;
+        } else {
+          from += step;
+        }
+      } else {
+        keepFetching = false;
+      }
     }
 
-    const reports = data.map(val => this.mapSupabaseReportToApp(val));
+    const reports = allReports.map(val => this.mapSupabaseReportToApp(val));
 
     // Set Cache
     this.setCache(cacheKey, reports);
@@ -246,14 +266,13 @@ class DBService {
     const user = await authService.getCurrentUser();
     if (!user) return 0;
 
-    const cacheKey = `reports_count_${user.id}`;
+    const cacheKey = `reports_count_global`;
     const cached = this.getFromCache<number>(cacheKey);
     if (cached !== null) return cached;
 
     const { count, error } = await supabase
       .from('reports')
-      .select('*', { count: 'exact', head: true })
-      .eq('created_by', user.id); // FILTER BY USER
+      .select('*', { count: 'exact', head: true });
 
     if (error) return 0;
     const finalCount = count || 0;
@@ -269,7 +288,6 @@ class DBService {
     const { data, error } = await supabase
       .from('reports')
       .select('id')
-      .eq('created_by', user.id) // FILTER BY USER
       .order('id', { ascending: true });
 
     if (error) return [];
@@ -309,8 +327,7 @@ class DBService {
 
     const { error } = await supabase
       .from('reports')
-      .delete()
-      .eq('created_by', user.id); // FILTER BY USER
+      .delete();
 
     if (error) throw error;
 
