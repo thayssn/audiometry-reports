@@ -623,7 +623,8 @@ export default function Editor() {
         'history',
         'results',
         'conclusion',
-        'recommendations'
+        'recommendations',
+        'status'
       ];
       const csvHeader = headers.join(',');
 
@@ -665,7 +666,8 @@ export default function Editor() {
         escapeCSV(history),
         escapeCSV(results),
         escapeCSV(conclusion),
-        escapeCSV(recommendations)
+        escapeCSV(recommendations),
+        isReportComplete(report as Report) ? "Completo" : "Incompleto"
       ].join(',');
 
       // Combine header and row

@@ -126,7 +126,7 @@ export default function IdentificationSection(props: Props) {
             </div>
             <div class="form-row">
                 <div class="form-field-full">
-                    <label for="base">{getFieldLabel('base')}</label>
+                    <label for="base">{getFieldLabel('base')} (controle interno)</label>
                     <input
                         id="base"
                         type="text"

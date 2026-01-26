@@ -139,6 +139,7 @@ class DBService {
         .from('reports')
         .update(dbPayload)
         .eq('id', id)
+        .eq('created_by', user.id) // Ensure user owns the report
         .select()
         .single();
 
@@ -163,12 +164,15 @@ class DBService {
   }
 
   async getReport(reportId: string | number): Promise<Report | null> {
+    const user = await authService.getCurrentUser();
+
     // Check Cache
     const cacheKey = `report_${reportId}`;
     const cached = this.getFromCache<Report>(cacheKey);
     if (cached) {
       toast.success("Relatório carregado do cache", {
-        duration: 500,
+        id: 'cache-hit',
+        duration: 2000,
       }); // Toast notification
       return cached;
     }
@@ -177,6 +181,7 @@ class DBService {
       .from('reports')
       .select('*')
       .eq('id', reportId)
+      .eq('created_by', user?.id) // Filter by user
       .single();
 
     if (error) {
@@ -207,7 +212,8 @@ class DBService {
     const { error } = await supabase
       .from('reports')
       .delete()
-      .eq('id', reportId);
+      .eq('id', reportId)
+      .eq('created_by', user.id); // FILTER BY USER
 
     if (error) throw error;
 
@@ -220,7 +226,7 @@ class DBService {
     if (!user) return [];
 
     // Check Cache
-    const cacheKey = `reports_list_global`;
+    const cacheKey = `reports_list_${user.id}`;
     const cached = this.getFromCache<Report[]>(cacheKey);
     if (cached) return cached;
 
@@ -233,6 +239,7 @@ class DBService {
       const { data, error } = await supabase
         .from('reports')
         .select('*')
+        .eq('created_by', user.id) // FILTER BY USER
         .order('updated_at', { ascending: false })
         .range(from, from + step - 1);
 
@@ -266,13 +273,14 @@ class DBService {
     const user = await authService.getCurrentUser();
     if (!user) return 0;
 
-    const cacheKey = `reports_count_global`;
+    const cacheKey = `reports_count_${user.id}`;
     const cached = this.getFromCache<number>(cacheKey);
     if (cached !== null) return cached;
 
     const { count, error } = await supabase
       .from('reports')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('created_by', user.id); // FILTER BY USER
 
     if (error) return 0;
     const finalCount = count || 0;
@@ -288,6 +296,7 @@ class DBService {
     const { data, error } = await supabase
       .from('reports')
       .select('id')
+      .eq('created_by', user.id) // FILTER BY USER
       .order('id', { ascending: true });
 
     if (error) return [];
@@ -327,7 +336,8 @@ class DBService {
 
     const { error } = await supabase
       .from('reports')
-      .delete();
+      .delete()
+      .eq('created_by', user.id); // FILTER BY USER
 
     if (error) throw error;
 

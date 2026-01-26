@@ -159,7 +159,8 @@ export default function Reports() {
         'history',
         'results',
         'conclusion',
-        'recommendations'
+        'recommendations',
+        'status'
       ];
       const csvHeader = headers.join(',');
 
@@ -202,7 +203,8 @@ export default function Reports() {
           escapeCSV(history),
           escapeCSV(results),
           escapeCSV(conclusion),
-          escapeCSV(recommendations)
+          escapeCSV(recommendations),
+          isReportComplete(report) ? "Completo" : "Incompleto"
         ].join(',');
       });
 

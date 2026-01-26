@@ -12,6 +12,7 @@ export default function App() {
         <main>
           <Toaster
             position="top-center"
+            gutter={8}
             toastOptions={{
               duration: 3000,
               style: {
