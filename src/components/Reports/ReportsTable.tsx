@@ -17,13 +17,15 @@ type Props = {
   onClearAll: () => void;
   selectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
+  currentPage: number;
+  onPageChange: (page: number) => void;
 };
 
 export default function ReportsTable(props: Props) {
   const [sortField, setSortField] = createSignal<SortField | 'id'>('id');
   const [sortDirection, setSortDirection] = createSignal<SortDirection>('asc');
-  const [currentPage, setCurrentPage] = createSignal(1);
-  const itemsPerPage = 20;
+  // Internal pagination state removed in favor of props
+  const itemsPerPage = 30;
 
   const isAllSelected = () => {
     return props.reports.length > 0 && props.reports.every(r => props.selectedIds.includes(String(r.id)));
@@ -100,7 +102,7 @@ export default function ReportsTable(props: Props) {
 
   const paginatedReports = () => {
     const sorted = sortedReports();
-    const start = (currentPage() - 1) * itemsPerPage;
+    const start = (props.currentPage - 1) * itemsPerPage;
     const end = start + itemsPerPage;
     return sorted.slice(start, end);
   };
@@ -114,12 +116,12 @@ export default function ReportsTable(props: Props) {
 
   const goToPage = (page: number) => {
     if (page < 1 || page > totalPages()) return;
-    setCurrentPage(page);
+    props.onPageChange(page);
   };
 
   const getPageNumbers = () => {
     const total = totalPages();
-    const current = currentPage();
+    const current = props.currentPage;
     const pages: number[] = [];
 
     if (total <= 7) {
@@ -205,7 +207,6 @@ export default function ReportsTable(props: Props) {
                   )}
                 </For>
                 <th>Status</th>
-                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -227,10 +228,10 @@ export default function ReportsTable(props: Props) {
                         return (
                           <td
                             onClick={isNameField ? (e) => e.stopPropagation() : undefined}
-                            style={isNameField ? { cursor: 'text' } : undefined}
+                            style={isNameField ? { cursor: 'text', "font-weight": "bold" } : undefined}
                           >
                             {field.type === 'date'
-                              ? formatDateUTC(value as Date)
+                              ? formatDateUTC(value as string)
                               : String(value)
                             }
                           </td>
@@ -244,32 +245,6 @@ export default function ReportsTable(props: Props) {
                         <span class="status-badge pending">Incompleto</span>
                       )}
                     </td>
-                    <td>
-                      <div class="action-buttons">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            props.onReportClick(String(report.id));
-                          }}
-                          class="action-btn btn-edit"
-                          title="Editar relatório"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            props.onDeleteReport(String(report.id));
-                          }}
-                          class="action-btn btn-delete"
-                          title="Deletar relatório"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 )}
               </For>
@@ -279,13 +254,13 @@ export default function ReportsTable(props: Props) {
 
         <div class="pagination">
           <div class="pagination-info">
-            Mostrando {((currentPage() - 1) * itemsPerPage) + 1} - {Math.min(currentPage() * itemsPerPage, props.reports.length)} de {props.reports.length} relatórios
+            Mostrando {((props.currentPage - 1) * itemsPerPage) + 1} - {Math.min(props.currentPage * itemsPerPage, props.reports.length)} de {props.reports.length} relatórios
           </div>
 
           <div class="pagination-controls">
             <button
-              onClick={() => goToPage(currentPage() - 1)}
-              disabled={currentPage() === 1}
+              onClick={() => goToPage(props.currentPage - 1)}
+              disabled={props.currentPage === 1}
               type="button"
             >
               Anterior
@@ -299,7 +274,7 @@ export default function ReportsTable(props: Props) {
                 >
                   <button
                     onClick={() => goToPage(page)}
-                    classList={{ active: page === currentPage() }}
+                    classList={{ active: page === props.currentPage }}
                     type="button"
                   >
                     {page}
@@ -309,8 +284,8 @@ export default function ReportsTable(props: Props) {
             </For>
 
             <button
-              onClick={() => goToPage(currentPage() + 1)}
-              disabled={currentPage() === totalPages()}
+              onClick={() => goToPage(props.currentPage + 1)}
+              disabled={props.currentPage === totalPages()}
               type="button"
             >
               Próxima

@@ -6,9 +6,9 @@ import { getFieldLabel } from "../../config/fields";
 type IdentificationData = {
     name: string;
     age: number;
-    birth_date: Date | null;
-    admission_date: Date | null;
-    last_sequential_exam_date: Date | null;
+    birth_date: string | null; // YYYY-MM-DD
+    admission_date: string | null;
+    last_sequential_exam_date: string | null;
     position: string;
     department: string;
     base?: string;
@@ -16,23 +16,13 @@ type IdentificationData = {
 
 type Props = {
     identification: Accessor<IdentificationData>;
-    onUpdate: (field: keyof IdentificationData, value: string | number | Date | null) => void;
+    onUpdate: (field: keyof IdentificationData, value: string | number | null) => void;
 };
 
 export default function IdentificationSection(props: Props) {
     const getDateValue = (dateField: keyof IdentificationData) => {
-        const date = props.identification()[dateField] as Date;
-
-        if (!date) return '';
-
-        try {
-            if (date instanceof Date && !isNaN(date.getTime())) {
-                return date.toISOString().split('T')[0];
-            }
-        } catch (e) {
-            console.error('Invalid date:', e);
-        }
-
+        const val = props.identification()[dateField];
+        if (typeof val === 'string') return val.split('T')[0];
         return '';
     };
 
@@ -68,10 +58,7 @@ export default function IdentificationSection(props: Props) {
                         type="date"
                         value={getDateValue('birth_date')}
                         onInput={(e) => {
-                            const value = e.currentTarget.value;
-                            if (value) {
-                                props.onUpdate('birth_date', new Date(value));
-                            }
+                            props.onUpdate('birth_date', e.currentTarget.value || null);
                         }}
                     />
                 </div>
@@ -84,10 +71,7 @@ export default function IdentificationSection(props: Props) {
                         type="date"
                         value={getDateValue('admission_date')}
                         onInput={(e) => {
-                            const value = e.currentTarget.value;
-                            if (value) {
-                                props.onUpdate('admission_date', new Date(value));
-                            }
+                            props.onUpdate('admission_date', e.currentTarget.value || null);
                         }}
                     />
                 </div>
@@ -98,8 +82,7 @@ export default function IdentificationSection(props: Props) {
                         type="date"
                         value={getDateValue('last_sequential_exam_date')}
                         onInput={(e) => {
-                            const value = e.currentTarget.value;
-                            props.onUpdate('last_sequential_exam_date', value ? new Date(value) : null);
+                            props.onUpdate('last_sequential_exam_date', e.currentTarget.value || null);
                         }}
                     />
                 </div>

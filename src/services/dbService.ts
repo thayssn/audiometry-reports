@@ -26,9 +26,9 @@ export type Report = {
   identification: {
     name: string;
     age: number;
-    birth_date: Date | null;
-    admission_date: Date | null;
-    last_sequential_exam_date: Date | null;
+    birth_date: string | null;            // ISO YYYY-MM-DD
+    admission_date: string | null;        // ISO YYYY-MM-DD
+    last_sequential_exam_date: string | null; // ISO YYYY-MM-DD
     position: string;
     department: string;
     base?: string;
@@ -45,9 +45,9 @@ export type Report = {
 export const isReportComplete = (report: Report): boolean => {
   if (!report.identification.name || report.identification.name.trim() === '') return false;
   if (!report.identification.age || report.identification.age === 0) return false;
-  if (!report.identification.birth_date || report.identification.birth_date === null) return false;
-  if (!report.identification.admission_date || report.identification.admission_date === null) return false;
-  if (!report.identification.last_sequential_exam_date || report.identification.last_sequential_exam_date === null) return false;
+  if (!report.identification.birth_date || report.identification.birth_date === '') return false;
+  if (!report.identification.admission_date || report.identification.admission_date === '') return false;
+  if (!report.identification.last_sequential_exam_date || report.identification.last_sequential_exam_date === '') return false;
   if (!report.identification.position || report.identification.position.trim() === '') return false;
   if (!report.identification.department || report.identification.department.trim() === '') return false;
 
@@ -89,6 +89,11 @@ class DBService {
     this.cache.set(key, { data, timestamp: Date.now() });
   }
 
+  // Allow clearing cache externally (e.g. on login/logout)
+  public clearCache(): void {
+    this.cache.clear();
+  }
+
   private invalidateCache(keyPrefix: string): void {
     if (keyPrefix) {
       this.cache.delete(keyPrefix);
@@ -117,6 +122,7 @@ class DBService {
     // Separate ID from data
     const { id, ...reportData } = report;
 
+    // No date transformation needed, strings go as they are
     const dbPayload = {
       created_by: user.id,
       identification: report.identification,
@@ -166,16 +172,18 @@ class DBService {
   async getReport(reportId: string | number): Promise<Report | null> {
     const user = await authService.getCurrentUser();
 
-    // Check Cache
+    // Cache disabled for full reports to ensure fresh data
+    /*
     const cacheKey = `report_${reportId}`;
     const cached = this.getFromCache<Report>(cacheKey);
     if (cached) {
       toast.success("Relatório carregado do cache", {
         id: 'cache-hit',
         duration: 2000,
-      }); // Toast notification
+      }); 
       return cached;
     }
+    */
 
     const { data, error } = await supabase
       .from('reports')
@@ -193,8 +201,8 @@ class DBService {
 
     const report = this.mapSupabaseReportToApp(data);
 
-    // Set Cache
-    this.setCache(cacheKey, report);
+    // No caching
+    // this.setCache(cacheKey, report);
 
     return report;
   }
@@ -225,10 +233,12 @@ class DBService {
     const user = await authService.getCurrentUser();
     if (!user) return [];
 
-    // Check Cache
+    // Cache disabled for full list
+    /*
     const cacheKey = `reports_list_${user.id}`;
     const cached = this.getFromCache<Report[]>(cacheKey);
     if (cached) return cached;
+    */
 
     let allReports: any[] = [];
     let from = 0;
@@ -263,8 +273,7 @@ class DBService {
 
     const reports = allReports.map(val => this.mapSupabaseReportToApp(val));
 
-    // Set Cache
-    this.setCache(cacheKey, reports);
+    // this.setCache(cacheKey, reports);
 
     return reports;
   }
@@ -303,30 +312,150 @@ class DBService {
     return data.map(r => r.id);
   }
 
-  async addReports(reports: Report[]): Promise<void> {
-    // Batch insert
+  async addReports(reports: Report[], updateExisting: boolean = false): Promise<string[]> {
+    const notFoundNames: string[] = [];
+    // Batch insert/update
     const user = await authService.getCurrentUser();
     if (!user) throw new Error('User not logged in');
 
-    const payload = reports.map(r => ({
-      created_by: user.id,
-      identification: r.identification,
-      history: r.history,
-      results: r.results,
-      conclusion: r.conclusion,
-      recommendations: r.recommendations,
-      created_at: r.created_at,
-      updated_at: r.updated_at
-    }));
+    if (updateExisting) {
+      // 1. Fetch ALL existing reports for this user (id and name only) to build a map
+      // This avoids N+1 queries.
+      // Note: If user has 100k+ reports, we might need to batch this fetch too, but for now fetch all ID+Identity
+      let allExisting: { id: string | number, identification: any }[] = [];
 
-    const { error } = await supabase
-      .from('reports')
-      .insert(payload);
+      // We can reuse getAllReports logic but lighter
+      let from = 0;
+      const step = 2000;
+      let keepFetching = true;
 
-    if (error) throw error;
+      while (keepFetching) {
+        const { data, error } = await supabase
+          .from('reports')
+          .select('id, identification')
+          .eq('created_by', user.id)
+          .range(from, from + step - 1);
+
+        if (error || !data || data.length === 0) {
+          keepFetching = false;
+        } else {
+          allExisting = [...allExisting, ...data];
+          if (data.length < step) keepFetching = false;
+          from += step;
+        }
+      }
+
+      // 2. Build a Map for fast lookup: Name -> ExistingRecord
+      // Normalize names to lowercase/trimmed/accent-free for better matching
+      const normalizeKey = (str: string) => {
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      };
+
+      const existingMap = new Map<string, typeof allExisting[0][]>();
+      allExisting.forEach(r => {
+        if (r.identification?.name) {
+          const key = normalizeKey(r.identification.name);
+          const currentList = existingMap.get(key) || [];
+          currentList.push(r);
+          existingMap.set(key, currentList);
+        }
+      });
+
+      // 3. Prepare Bulk Updates
+      const updates: any[] = [];
+
+      const processedIds = new Set<string | number>();
+
+      for (const report of reports) {
+        const nameKey = normalizeKey(report.identification.name);
+        const existingList = existingMap.get(nameKey);
+
+        if (existingList && existingList.length > 0) {
+          // Update ALL matching records for this user
+          for (const existing of existingList) {
+            // Prevent duplicate updates for the same ID in the same batch
+            if (processedIds.has(existing.id)) {
+              continue;
+            }
+            processedIds.add(existing.id);
+
+            // FOUND: Update fields
+            const incoming = report.identification;
+            const current = existing.identification;
+
+            const updatedIdentification = {
+              ...current,
+              base: incoming.base && incoming.base.trim() !== '' ? incoming.base : current.base,
+              birth_date: incoming.birth_date ? incoming.birth_date : current.birth_date,
+              admission_date: incoming.admission_date ? incoming.admission_date : current.admission_date,
+              last_sequential_exam_date: incoming.last_sequential_exam_date ? incoming.last_sequential_exam_date : current.last_sequential_exam_date,
+              position: incoming.position && incoming.position.trim() !== '' ? incoming.position : current.position,
+              department: incoming.department && incoming.department.trim() !== '' ? incoming.department : current.department,
+              age: incoming.age && incoming.age > 0 ? incoming.age : current.age
+            };
+
+            updates.push({
+              id: existing.id,
+              created_by: user.id, // REQUIRED for upsert
+              identification: updatedIdentification,
+              updated_at: new Date().toISOString()
+            });
+          }
+        } else {
+          // NOT FOUND
+          const realName = report.identification.name.trim();
+          notFoundNames.push(realName);
+        }
+      }
+
+      // 4. Perform Batch Updates (Upsert style, but since we have IDs, it updates)
+      // Supabase .upsert() is efficient.
+      if (updates.length > 0) {
+        // Upsert in chunks of 100 to avoid payload limits
+        const chunkSize = 100;
+        for (let i = 0; i < updates.length; i += chunkSize) {
+          const chunk = updates.slice(i, i + chunkSize);
+          const { error } = await supabase
+            .from('reports')
+            .upsert(chunk) // Upsert works because we included 'id'
+            .select();     // Optional, just to verify
+
+          if (error) {
+            console.error('Batch update error:', error);
+            // Verify if we should throw or continue
+            throw error;
+          }
+        }
+      }
+
+    } else {
+
+      // Standard batch insert (current logic)
+      const payload = reports.map(r => {
+        // No date formatting needed, pass strings directly
+        return {
+          created_by: user.id,
+          identification: r.identification,
+          history: r.history,
+          results: r.results,
+          conclusion: r.conclusion,
+          recommendations: r.recommendations,
+          created_at: r.created_at,
+          updated_at: r.updated_at
+        };
+      });
+
+      const { error } = await supabase
+        .from('reports')
+        .insert(payload);
+
+      if (error) throw error;
+    }
 
     // Invalidate lists
     this.invalidateCache('');
+
+    return notFoundNames;
   }
 
   async clearAllData(): Promise<void> {
@@ -392,16 +521,7 @@ class DBService {
   private mapSupabaseReportToApp(data: any): Report {
     const identification = data.identification || {};
 
-    // Convert date strings back to Date objects
-    if (identification.birth_date && typeof identification.birth_date === 'string') {
-      identification.birth_date = new Date(identification.birth_date);
-    }
-    if (identification.admission_date && typeof identification.admission_date === 'string') {
-      identification.admission_date = new Date(identification.admission_date);
-    }
-    if (identification.last_sequential_exam_date && typeof identification.last_sequential_exam_date === 'string') {
-      identification.last_sequential_exam_date = new Date(identification.last_sequential_exam_date);
-    }
+    // NO parsing back to Date objects. Strings stay strings.
 
     return {
       id: data.id,

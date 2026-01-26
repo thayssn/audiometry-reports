@@ -19,6 +19,7 @@ export default function Reports() {
   const [selectedIds, setSelectedIds] = createSignal<string[]>([]);
   const [isLoading, setIsLoading] = createSignal(true);
   const [settings, setSettings] = createSignal<AppSettings>(DEFAULT_SETTINGS);
+  const [currentPage, setCurrentPage] = createSignal(1);
 
   onMount(async () => {
     await loadReports();
@@ -45,7 +46,22 @@ export default function Reports() {
   };
 
   const handleFilterChange = (filters: FilterCriteria) => {
+    setCurrentPage(1); // Reset to page 1 on filter change
     let filtered = [...reports()];
+
+    // ... search by name etc ...
+    if (filters.searchTerm) {
+      const term = filters.searchTerm.toLowerCase();
+      filtered = filtered.filter(r => r.identification.name.toLowerCase().includes(term));
+    }
+
+    // ...
+    // Note: I am not replacing the entire function, just the start where I add setCurrentPage(1)
+    // but replace_file_content requires exact context matching.
+    // I will replace the state initialization area and then the JSX area.
+    // Actually, I can't do split edits easily without multi_replace.
+    // Using simple replace for state init first.
+
 
     // Search by name
     if (filters.searchTerm) {
@@ -63,6 +79,25 @@ export default function Reports() {
     if (filters.department) {
       const term = filters.department.toLowerCase();
       filtered = filtered.filter(r => r.identification.department.toLowerCase().includes(term));
+    }
+
+    // Filter by base
+    if (filters.base) {
+      const term = filters.base.toLowerCase();
+      filtered = filtered.filter(r => (r.identification.base || "").toLowerCase().includes(term));
+    }
+
+    // Filter by year (last_sequential_exam_date)
+    if (filters.year) {
+      const term = filters.year.trim();
+      if (term.length === 4) {
+        filtered = filtered.filter(r => {
+          const date = r.identification.last_sequential_exam_date;
+          if (!date) return false;
+          // Date is YYYY-MM-DD
+          return date.startsWith(term);
+        });
+      }
     }
 
     // Status filter (complete vs incomplete reports)
@@ -180,7 +215,7 @@ export default function Reports() {
 
           // Format dates as DD/MM/YYYY
           if (field.type === 'date' && value) {
-            return formatDateUTC(value as Date);
+            return formatDateUTC(value as string);
           }
 
           return escapeCSV(String(value || ''));
@@ -304,6 +339,8 @@ export default function Reports() {
             onClearAll={handleClearAllData}
             selectedIds={selectedIds()}
             onSelectionChange={setSelectedIds}
+            currentPage={currentPage()}
+            onPageChange={setCurrentPage}
           />
         </>
       )}

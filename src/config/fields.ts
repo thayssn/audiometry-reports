@@ -31,13 +31,13 @@ export const IDENTIFICATION_FIELDS: FieldConfig[] = [
     label: 'Idade',
     csvColumns: ['age', 'idade'],
     inCSV: true,
-    sortable: true,
+    sortable: false,
     filterable: true
   },
   {
     key: 'birth_date',
     type: 'date',
-    label: 'Data de Nascimento',
+    label: 'Nascimento',
     csvColumns: ['birth_date', 'data_nascimento', 'data de nascimento'],
     inCSV: true,
     sortable: true
@@ -45,7 +45,7 @@ export const IDENTIFICATION_FIELDS: FieldConfig[] = [
   {
     key: 'admission_date',
     type: 'date',
-    label: 'Data de Admissão',
+    label: 'Admissão',
     csvColumns: ['admission_date', 'data_admissao', 'data de admissão'],
     inCSV: true,
     sortable: true,
@@ -54,7 +54,7 @@ export const IDENTIFICATION_FIELDS: FieldConfig[] = [
   {
     key: 'last_sequential_exam_date',
     type: 'date',
-    label: 'Data do Último Exame Sequencial',
+    label: 'Último Exame',
     csvColumns: ['last_sequential_exam_date', 'data_ultimo_exame', 'ultimo_exame'],
     inCSV: true,
     sortable: true
@@ -63,9 +63,9 @@ export const IDENTIFICATION_FIELDS: FieldConfig[] = [
     key: 'position',
     type: 'text',
     label: 'Cargo',
-    csvColumns: ['position', 'cargo'],
+    csvColumns: ['position', 'cargo', 'funcao', 'função'],
     inCSV: true,
-    sortable: true,
+    sortable: false,
     filterable: true,
     reportLabel: 'Cargo'
   },
@@ -73,9 +73,9 @@ export const IDENTIFICATION_FIELDS: FieldConfig[] = [
     key: 'department',
     type: 'text',
     label: 'Setor',
-    csvColumns: ['department', 'setor'],
+    csvColumns: ['department', 'setor', 'departamento', 'area', 'área'],
     inCSV: true,
-    sortable: true,
+    sortable: false,
     filterable: true,
     reportLabel: 'Setor'
   },
@@ -83,7 +83,7 @@ export const IDENTIFICATION_FIELDS: FieldConfig[] = [
     key: 'base',
     type: 'text',
     label: 'Base',
-    csvColumns: ['base', 'unidade', 'local'],
+    csvColumns: ['base', 'unidade', 'local', 'filial', 'localização', 'localizacao', 'local de trabalho'],
     inCSV: true,
     sortable: true,
     filterable: true

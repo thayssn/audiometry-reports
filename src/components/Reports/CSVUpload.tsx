@@ -13,6 +13,8 @@ export default function CSVUpload(props: Props) {
   const [isLoading, setIsLoading] = createSignal(false);
   const [showPreview, setShowPreview] = createSignal(false);
   const [clearExisting, setClearExisting] = createSignal(false);
+  const [updateBasedOnName, setUpdateBasedOnName] = createSignal(false);
+  const [failedUpdates, setFailedUpdates] = createSignal<string[]>([]);
 
   const parseCSV = (text: string): Report[] => {
     // Robust CSV parser that handles multiline quoted fields
@@ -90,31 +92,31 @@ export default function CSVUpload(props: Props) {
 
     const reports: Report[] = [];
 
-    // Helper to parse dates (returns null if parsing fails or empty)
-    const parseDate = (dateStr: string, fieldLabel: string, rowNum: number): Date | null => {
-      if (!dateStr || dateStr.trim() === '') {
-        return null;
-      }
+    // Helper to parse dates to YYYY-MM-DD string
+    const parseDateToString = (dateStr: string, fieldLabel: string, rowNum: number): string | null => {
+      if (!dateStr || dateStr.trim() === '') return null;
 
       try {
-        if (dateStr.includes('/')) {
-          const parts = dateStr.split('/');
-          if (parts.length === 3) {
-            const day = parseInt(parts[0]);
-            const month = parseInt(parts[1]) - 1;
-            const year = parseInt(parts[2]);
-            const date = new Date(year, month, day);
-            if (!isNaN(date.getTime())) return date;
+        // Normalize separators: 13-03-2003 -> 13/03/2003
+        const normalized = dateStr.replace(/-/g, '/');
+        const parts = normalized.split('/');
+
+        if (parts.length === 3) {
+          // STRICTLY EXPECT DD/MM/YYYY
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[2];
+
+          // Basic validation
+          if (year.length === 4) {
+            return `${year}-${month}-${day}`;
           }
-        } else {
-          const date = new Date(dateStr);
-          if (!isNaN(date.getTime())) return date;
         }
       } catch (e) {
-        console.log(e)
+        console.log(e);
       }
 
-      console.warn(`Linha ${rowNum}: ${fieldLabel} inválida "${dateStr}". Usando vazio.`);
+      toast.error(`Linha ${rowNum}: ${fieldLabel} inválida "${dateStr}". Esperado formato DD/MM/YYYY.`);
       return null;
     };
 
@@ -131,6 +133,8 @@ export default function CSVUpload(props: Props) {
       const admissionDateStr = columnIndices.has('admission_date') ? values[columnIndices.get('admission_date')!] : '';
       const position = columnIndices.has('position') ? values[columnIndices.get('position')!] : '';
       const department = columnIndices.has('department') ? values[columnIndices.get('department')!] : '';
+      const base = columnIndices.has('base') ? values[columnIndices.get('base')!] : '';
+      const lastExamStr = columnIndices.has('last_sequential_exam_date') ? values[columnIndices.get('last_sequential_exam_date')!] : '';
 
       // Check for additional report fields
       const historyIdx = headers.findIndex(h => h === 'history');
@@ -138,21 +142,44 @@ export default function CSVUpload(props: Props) {
       const conclusionIdx = headers.findIndex(h => h === 'conclusion');
       const recommendationsIdx = headers.findIndex(h => h === 'recommendations');
 
+      // Calculate age from birth date helper (adapted for string input)
+      const calculateAgeInImport = (birthDateString: string | null): number => {
+        if (!birthDateString) return 0;
+        try {
+          // birthDateString is YYYY-MM-DD
+          const parts = birthDateString.split('-');
+          if (parts.length !== 3) return 0;
+
+          const birthYear = parseInt(parts[0]);
+          const birthMonth = parseInt(parts[1]) - 1; // 0-indexed
+          const birthDay = parseInt(parts[2]);
+
+          const today = new Date();
+          let age = today.getFullYear() - birthYear;
+          const monthDiff = today.getMonth() - birthMonth;
+
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDay)) {
+            age--;
+          }
+          return age;
+        } catch (e) { return 0; }
+      };
+
       // Only validate name (required field)
       if (!name || name.trim() === '') {
-        // If row is mostly empty, maybe skip? But let's throw to be safe or just skip
-        // console.warn(`Linha ${rowNum}: Nome ausente, pulando.`);
         return;
       }
 
-      // Parse age if provided, otherwise use 0
-      const age = ageStr ? parseInt(ageStr) : 0;
-      // Relaxed logging for age, just force 0 if invalid to not break import
-      // if (ageStr && (isNaN(age) || age < 0 || age > 150)) { ... }
+      // Parse dates first so we can use them for age calculation
+      const birthDate = birthDateStr ? parseDateToString(birthDateStr, getFieldLabel('birth_date'), rowNum) : null;
+      const admissionDate = admissionDateStr ? parseDateToString(admissionDateStr, getFieldLabel('admission_date'), rowNum) : null;
+      const lastExamDate = lastExamStr ? parseDateToString(lastExamStr, getFieldLabel('last_sequential_exam_date'), rowNum) : null;
 
-      // Parse dates if provided, otherwise use current date
-      const birthDate = birthDateStr ? parseDate(birthDateStr, getFieldLabel('birth_date'), rowNum) : null;
-      const admissionDate = admissionDateStr ? parseDate(admissionDateStr, getFieldLabel('admission_date'), rowNum) : null;
+      // Parse age if provided, OTHERWISE calculate from birth date
+      let age = ageStr ? parseInt(ageStr) : 0;
+      if ((!age || age === 0) && birthDate) {
+        age = calculateAgeInImport(birthDate);
+      }
 
       // Parse additional report fields
       const history = historyIdx !== -1 && values[historyIdx] ? values[historyIdx].split(';').map(s => s.trim()).filter(s => s) : [];
@@ -190,9 +217,10 @@ export default function CSVUpload(props: Props) {
           age,
           birth_date: birthDate,
           admission_date: admissionDate,
-          last_sequential_exam_date: null,
+          last_sequential_exam_date: lastExamDate,
           position,
-          department
+          department,
+          base
         },
         history,
         results,
@@ -256,16 +284,21 @@ export default function CSVUpload(props: Props) {
       }
 
       console.log(`Adding ${reports.length} new reports...`);
-      await dbService.addReports(reports);
+      const notFoundElement = await dbService.addReports(reports, updateBasedOnName());
 
-      toast.success(`${reports.length} relatórios importados com sucesso!`);
+      if (notFoundElement.length > 0) {
+        setFailedUpdates(notFoundElement);
+        toast.success(`${reports.length - notFoundElement.length} atualizados. ${notFoundElement.length} não encontrados.`);
+      } else {
+        toast.success(`${reports.length} relatórios processados com sucesso!`);
+        // Reset only on full success
+        setFile(null);
+        setPreview([]);
+        setShowPreview(false);
+        props.onImportComplete();
+      }
 
-      // Reset
-      setFile(null);
-      setPreview([]);
-      setShowPreview(false);
 
-      props.onImportComplete();
     } catch (error) {
       console.error('Import error:', error);
       toast.error(error instanceof Error ? error.message : 'Erro ao importar relatórios');
@@ -304,6 +337,18 @@ export default function CSVUpload(props: Props) {
               />
               <span>Limpar dados existentes antes de importar</span><br />{clearExisting() ? <b class="danger">🚨 Dados apagados permanentemente</b> : null}
             </label>
+            <label class="checkbox-label" style="margin-top: 10px; display: block;">
+              <input
+                type="checkbox"
+                checked={updateBasedOnName()}
+                onChange={(e) => {
+                  setUpdateBasedOnName(e.currentTarget.checked);
+                  if (e.currentTarget.checked) setClearExisting(false);
+                }}
+                disabled={clearExisting()}
+              />
+              <span>Atualizar base de dados existentes (baseado no NOME)</span>
+            </label>
           </div>
 
           <div class="upload-actions">
@@ -313,6 +358,26 @@ export default function CSVUpload(props: Props) {
               type="button"
             >
               {isLoading() ? 'Processando...' : 'Visualizar Preview'}
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  setIsLoading(true);
+                  const text = await file()!.text();
+                  const reports = parseCSV(text);
+                  setPreview(reports);
+                  await handleImport();
+                } catch (error) {
+                  console.error('Import error:', error);
+                  toast.error(error instanceof Error ? error.message : 'Erro ao importar');
+                  setIsLoading(false);
+                }
+              }}
+              disabled={isLoading()}
+              type="button"
+              style={{ "background": "var(--success)", "color": "white" }}
+            >
+              {isLoading() ? 'Importando...' : '⚡ Importar Direto'}
             </button>
           </div>
         </Show>
@@ -345,10 +410,10 @@ export default function CSVUpload(props: Props) {
                       <td>{index() + 1}</td>
                       <td>{report.identification.name}</td>
                       <td>{report.identification.age}</td>
-                      <td>{report.identification.birth_date ? new Date(report.identification.birth_date).toLocaleDateString('pt-BR') : ''}</td>
+                      <td>{report.identification.birth_date ? report.identification.birth_date.split('-').reverse().join('/') : ''}</td>
                       <td>{report.identification.position}</td>
                       <td>{report.identification.department}</td>
-                      <td>{report.identification.admission_date ? new Date(report.identification.admission_date).toLocaleDateString('pt-BR') : ''}</td>
+                      <td>{report.identification.admission_date ? report.identification.admission_date.split('-').reverse().join('/') : ''}</td>
                     </tr>
                   )}
                 </For>
@@ -375,7 +440,30 @@ export default function CSVUpload(props: Props) {
           </div>
         </div>
       </Show>
+
+      {/* Failed Updates Modal */}
+      <Show when={failedUpdates().length > 0}>
+        <div class="modal-overlay">
+          <div class="modal-content">
+            <h3 class="danger">Relatórios Não Atualizados</h3>
+            <p>Os seguintes nomes não foram encontrados na base de dados e não puderam ser atualizados:</p>
+            <div class="failed-list">
+              <ul>
+                <For each={failedUpdates()}>
+                  {(name) => <li>{name}</li>}
+                </For>
+              </ul>
+            </div>
+            <button onClick={() => {
+              setFailedUpdates([]);
+              setFile(null);
+              setPreview([]);
+              setShowPreview(false);
+              props.onImportComplete();
+            }}>Fechar</button>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }
-

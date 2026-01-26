@@ -5,6 +5,8 @@ export type FilterCriteria = {
   position: string;
   department: string;
   status: 'all' | 'complete' | 'incomplete';
+  base: string;
+  year: string;
 };
 
 type Props = {
@@ -15,14 +17,16 @@ export default function FilterBar(props: Props) {
   const [searchTerm, setSearchTerm] = createSignal("");
   const [position, setPosition] = createSignal("");
   const [department, setDepartment] = createSignal("");
+  const [base, setBase] = createSignal("");
+  const [year, setYear] = createSignal("");
   const [status, setStatus] = createSignal<'all' | 'complete' | 'incomplete'>('all');
-  
+
   let debounceTimeout: number | undefined;
 
   // Debounced search
   createEffect(() => {
     const term = searchTerm();
-    
+
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
       applyFilters();
@@ -34,6 +38,8 @@ export default function FilterBar(props: Props) {
     position();
     department();
     status();
+    base();
+    year();
     applyFilters();
   });
 
@@ -42,7 +48,9 @@ export default function FilterBar(props: Props) {
       searchTerm: searchTerm(),
       position: position(),
       department: department(),
-      status: status()
+      status: status(),
+      base: base(),
+      year: year()
     });
   };
 
@@ -50,11 +58,13 @@ export default function FilterBar(props: Props) {
     setSearchTerm("");
     setPosition("");
     setDepartment("");
+    setBase("");
+    setYear("");
     setStatus('all');
   };
 
   const hasActiveFilters = () => {
-    return searchTerm() || position() || department() || status() !== 'all';
+    return searchTerm() || position() || department() || base() || year() || status() !== 'all';
   };
 
   return (
@@ -68,6 +78,30 @@ export default function FilterBar(props: Props) {
             placeholder="Digite o nome do paciente..."
             value={searchTerm()}
             onInput={(e) => setSearchTerm(e.currentTarget.value)}
+          />
+        </div>
+
+        <div class="filter-group">
+          <label for="base">Base</label>
+          <input
+            id="base"
+            type="text"
+            placeholder="Filtrar por base..."
+            value={base()}
+            onInput={(e) => setBase(e.currentTarget.value)}
+          />
+        </div>
+
+        <div class="filter-group">
+          <label for="year">Ano (Exame Seq.)</label>
+          <input
+            id="year"
+            type="text"
+            placeholder="AAAA"
+            value={year()}
+            onInput={(e) => setYear(e.currentTarget.value)}
+            maxLength={4}
+            style="width: 80px;"
           />
         </div>
 
@@ -94,7 +128,7 @@ export default function FilterBar(props: Props) {
         </div>
 
         <div class="filter-group">
-          <label for="status">Status do Relatório</label>
+          <label for="status">Status</label>
           <select
             id="status"
             value={status()}

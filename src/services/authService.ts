@@ -1,5 +1,6 @@
 
 import { supabase } from './supabase';
+import { dbService } from './dbService';
 
 export interface UserProfile {
     id: string;
@@ -28,6 +29,7 @@ export const authService = {
 
         // Success - Save session
         this._saveSession(data);
+        dbService.clearCache(); // Clean cache on new login
         return { data: { user: data }, error: null };
     },
 

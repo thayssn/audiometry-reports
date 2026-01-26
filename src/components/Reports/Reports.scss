@@ -1,5 +1,5 @@
 .reports-page {
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
   padding: 2rem;
 
@@ -110,10 +110,10 @@
       border-radius: 4px;
       cursor: pointer;
       transition: background 0.2s;
+      color: var(--color-lightest);
 
       &:hover {
         background: var(--color);
-        color: var(--color-lightest);
       }
     }
   }
@@ -403,7 +403,6 @@
   .table-container {
     overflow-x: auto;
     overflow-y: auto;
-    max-height: 600px;
     margin-bottom: 1.5rem;
     position: relative;
   }
@@ -411,6 +410,7 @@
   .reports-table {
     width: 100%;
     border-collapse: collapse;
+    font-size: 0.85rem;
 
     th,
     td {

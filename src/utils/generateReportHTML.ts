@@ -54,16 +54,18 @@ export const generateReportHTML = (report: Report): string => {
         // Format: "YYYY - Text"
         report.results.forEach(r => {
             html += `<div style="${STYLES.noBreak}">`;
-            html += `<p style="${STYLES.p}">`;
             const dashIndex = r.indexOf(' - ');
             if (dashIndex > 0) {
                 const year = r.substring(0, dashIndex);
                 const text = r.substring(dashIndex + 3);
-                html += `<strong style="${STYLES.strong}">${year}</strong> - ${text}`;
+                // Use a table-like structure for better alignment
+                html += `<p style="${STYLES.p} display: flex; align-items: baseline;">`;
+                html += `<strong style="${STYLES.strong} min-width: 0.5cm; flex-shrink: 0;">${year}</strong>`;
+                html += `<span style="margin-left: 0.1cm;">- ${text}</span>`;
+                html += `</p>`;
             } else {
-                html += r;
+                html += `<p style="${STYLES.p}">${r}</p>`;
             }
-            html += `</p>`;
             html += `</div>`;
         });
         html += `</div>`;

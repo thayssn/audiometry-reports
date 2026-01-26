@@ -25,9 +25,9 @@ type FormData = {
   identification: {
     name: string;
     age: number;
-    birth_date: Date | null;
-    admission_date: Date | null;
-    last_sequential_exam_date: Date | null;
+    birth_date: string | null;
+    admission_date: string | null;
+    last_sequential_exam_date: string | null;
     position: string;
     department: string;
     base: string;
@@ -247,9 +247,9 @@ export default function Editor() {
           identification: {
             ...report.identification,
             base: report.identification.base || "",
-            birth_date: report.identification.birth_date ? new Date(report.identification.birth_date) : null,
-            admission_date: report.identification.admission_date ? new Date(report.identification.admission_date) : null,
-            last_sequential_exam_date: report.identification.last_sequential_exam_date ? new Date(report.identification.last_sequential_exam_date) : null
+            birth_date: report.identification.birth_date ? report.identification.birth_date.split('T')[0] : null,
+            admission_date: report.identification.admission_date ? report.identification.admission_date.split('T')[0] : null,
+            last_sequential_exam_date: report.identification.last_sequential_exam_date ? report.identification.last_sequential_exam_date.split('T')[0] : null
           },
           history: report.history || [],
           results: structuredResults,
@@ -338,9 +338,15 @@ export default function Editor() {
       }
 
       setIsSaved(true);
-      toast.success("Relatório salvo com sucesso!");
+      toast.dismiss(); // Clear previous toasts
+      toast.success("Relatório salvo com sucesso!", {
+        id: 'success-save-report'
+      });
     } catch (error) {
-      toast.error("Erro ao salvar relatório");
+      toast.dismiss();
+      toast.error("Erro ao salvar relatório", {
+        id: 'error-save-report'
+      });
       console.error(error);
     } finally {
       setIsSaving(false);
@@ -348,10 +354,21 @@ export default function Editor() {
   };
 
 
-  // Helper function to calculate age from birth date
-  const calculateAge = (birthDate: Date | null): number => {
-    if (!birthDate) return 0;
+  // Helper function to calculate age from birth date string (YYYY-MM-DD)
+  const calculateAge = (birthDateStr: string | null): number => {
+    if (!birthDateStr) return 0;
+
+    // Parse YYYY-MM-DD
+    const parts = birthDateStr.split('-');
+    if (parts.length !== 3) return 0;
+
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; // 0-indexed month
+    const day = parseInt(parts[2]);
+
+    const birthDate = new Date(year, month, day);
     const today = new Date();
+
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
 
@@ -364,14 +381,14 @@ export default function Editor() {
   };
 
   // Update form field handlers
-  const handleUpdateIdentification = (field: keyof FormData['identification'], value: string | number | Date | null) => {
+  const handleUpdateIdentification = (field: keyof FormData['identification'], value: string | number | null) => {
     setForm((prev) => {
       const updates: Partial<FormData['identification']> = {
         [field]: value
       };
 
       // If birth_date is being updated, automatically calculate age
-      if (field === 'birth_date' && value instanceof Date) {
+      if (field === 'birth_date' && typeof value === 'string') {
         updates.age = calculateAge(value);
       }
 
@@ -641,8 +658,12 @@ export default function Editor() {
         const value = report.identification?.[field.key as keyof typeof report.identification];
 
         // Format dates as DD/MM/YYYY
-        if (field.type === 'date' && value) {
-          return formatDateUTC(value as Date);
+        if (field.type === 'date' && value && typeof value === 'string') {
+          const parts = value.split('-');
+          if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+          }
+          return value;
         }
 
         return escapeCSV(String(value || ''));
@@ -694,167 +715,214 @@ export default function Editor() {
     }
   };
 
+  // Delete report
+  const handleDeleteReport = async () => {
+    if (!currentReportId()) return;
+
+    const confirmed = window.confirm(
+      "Tem certeza que deseja deletar este relatório?\n\nEsta ação não pode ser desfeita."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await dbService.deleteReport(currentReportId()!);
+      toast.success("Relatório deletado com sucesso!");
+      navigate('/');
+    } catch (error) {
+      console.error("Error deleting report:", error);
+      toast.error("Erro ao deletar relatório!");
+    }
+  };
+
+  const isComplete = () => {
+    // Basic check for completion
+    const f = form();
+    return !!(f.identification.name && f.identification.birth_date && f.identification.admission_date);
+  };
+
   return (
-    <div class="form-wrapper" classList={{ "preview-hidden": !showPreview() }}>
-      <Show when={isLoadingReport()}>
+    <div class={`form-wrapper ${!showPreview() ? 'preview-hidden' : ''}`}>
+      {/* Loading Indicator */}
+      <Show when={isSaving() || isLoadingReport()}>
         <div class="loading-indicator">
           <div class="spinner"></div>
         </div>
       </Show>
 
-      <Show when={!isLoadingReport()}>
-        <div class="form-header">
-          <div class="header-top">
-            <div class="header-title">
-              <Show when={currentReportId()}><p class="id">{currentReportId()}</p></Show>
-              <h2>{form().identification.name || "Novo Relatório"}</h2>
-              <div class="status-badges">
-                <Show when={currentReportId()}>
-                  <span class="save-status" classList={{
-                    "status-saved": isSaved(),
-                    "status-pending": !isSaved(),
-                    "status-saving": isSaving()
-                  }}>
-                    {isSaving() ? "⏳ Salvando..." : isSaved() ? "✓ Salvo" : "● Não salvo"}
-                  </span>
-                </Show>
-                <Show when={currentReportId()}>
-                  <span class="completion-status" classList={{
-                    "status-complete": !!isReportComplete(formAsReport() as Report),
-                    "status-incomplete": !isReportComplete(formAsReport() as Report)
-                  }}>
-                    {isReportComplete(formAsReport() as Report) ? "📋 Completo" : "📝 Incompleto"}
-                  </span>
-                </Show>
-              </div>
-            </div>
-            <div class="form-actions">
-              <button type="button" onClick={() => setShowPreview(!showPreview())} title="Toggle Preview">
-                {showPreview() ? "👁️ Ocultar Preview" : "👁️ Mostrar Preview"}
-              </button>
-              <Show when={currentReportId()}>
-                <button type="button" onClick={handleDownloadPDF} title="Download PDF">
-                  📄 PDF
-                </button>
-                <button type="button" onClick={handleDownloadCSV} title="Download CSV">
-                  📥 CSV
-                </button>
-              </Show>
-              <button type="button" onClick={handleSaveForm} title="Salvar (Ctrl/Cmd + S)">
-                💾 Salvar
-              </button>
+      {/* Form Header */}
+      <div class="form-header">
+        <div class="header-top">
+          <div class="header-title">
+            <button class="back-button" onClick={() => navigate('/')}>
+              ↩
+            </button>
+            <Show when={currentReportId()}>
+              <span class="id">{currentReportId()}</span>
+            </Show>
+            <h2>
+              {form().identification.name || 'Novo Relatório'}
+            </h2>
+
+            <div class="status-badges">
+              <span class={`save-status status-${isSaving() ? 'saving' : (isSaved() ? 'saved' : 'pending')}`}>
+                {isSaving() ? 'Salvando...' : (isSaved() ? 'Salvo' : 'Não salvo')}
+              </span>
+              <span class={`completion-status status-${isComplete() ? 'complete' : 'incomplete'}`}>
+                {isComplete() ? 'Completo' : 'Incompleto'}
+              </span>
             </div>
           </div>
-        </div>
 
-        <div class="content-area">
-          <div class="form-container">
-            <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
-              <div class="form-grid">
-                {/* Item 1 */}
-                <div class="form-grid-item">
-                  <IdentificationSection
-                    identification={() => form().identification}
-                    onUpdate={handleUpdateIdentification}
-                  />
-                </div>
-
-                {/* Item 2 */}
-                <div class="form-grid-item">
-                  <HistorySection
-                    history={() => form().history}
-                    predefinedOptions={HISTORY_OPTIONS}
-                    isOptionSelected={(option) => isOptionSelected('history', option)}
-                    onToggleOption={(option) => handleToggleOption('history', option)}
-                    onRemoveCustomOption={(option) => handleRemoveCustomOption('history', option)}
-                    getCustomOptions={() => getCustomOptions('history', HISTORY_OPTIONS)}
-                    onAddCustomOption={(value) => handleAddCustomOption('history', value)}
-                  />
-                </div>
-
-                {/* Item 3 */}
-                <div class="form-grid-item">
-                  <ResultsSection
-                    results={() => form().results}
-                    predefinedOptions={RESULTS_OPTIONS}
-                    onAdd={handleAddYearResult}
-                    onRemove={handleRemoveYearResult}
-                    onUpdate={handleUpdateYearResult}
-                  />
-                </div>
-
-                {/* Item 4 */}
-                <div class="form-grid-item">
-                  <ConclusionSection
-                    conclusion={() => form().conclusion}
-                    onUpdate={(value) => handleUpdateField('conclusion', value)}
-                  />
-                </div>
-
-                {/* Item 5 */}
-                <div class="form-grid-item">
-                  <RecommendationsSection
-                    recommendations={() => form().recommendations}
-                    predefinedOptions={RECOMMENDATIONS_OPTIONS}
-                    isOptionSelected={(option) => isOptionSelected('recommendations', option)}
-                    onToggleOption={(option) => handleToggleOption('recommendations', option)}
-                    onRemoveCustomOption={(option) => handleRemoveCustomOption('recommendations', option)}
-                    getCustomOptions={() => getCustomOptions('recommendations', RECOMMENDATIONS_OPTIONS)}
-                    onAddCustomOption={(value) => handleAddCustomOption('recommendations', value)}
-                  />
-                </div>
-              </div>
-            </form>
-          </div>
-
-          {showPreview() && (
-            <div class="preview-container">
-              <RenderMarkdown content={content} />
-            </div>
-          )}
-        </div>
-
-        <Show when={currentReportId()}>
-          <div class="patient-navigation-bottom">
+          <div class="form-actions">
             <button
               type="button"
-              onClick={() => navigate('/patients')}
-              class="btn-back-to-list"
-              title="Voltar para lista de pacientes"
+              class="btn-toggle-preview"
+              onClick={() => setShowPreview(!showPreview())}
+              title={showPreview() ? "Ocultar pré-visualização" : "Mostrar pré-visualização"}
             >
-              📋 Lista de Pacientes
+              {showPreview() ? "🙉 Preview" : "🙈 Preview"}
             </button>
-            <div class="navigation-controls">
-              <button
-                type="button"
-                onClick={goToPreviousReport}
-                disabled={!canGoPrevious()}
-                title="Relatório Anterior (Ctrl/Cmd + ←)"
-              >
-                ⬅️ Anterior
-              </button>
-              <span class="patient-counter">
-                {(() => {
-                  const currentId = currentReportId();
-                  if (!currentId) return '';
-                  const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
-                  const ids = allReportIds();
-                  const currentIndex = ids.indexOf(idNum);
-                  if (currentIndex === -1) return `ID ${currentId} de ${totalReports()}`;
-                  return `${currentIndex + 1} de ${totalReports()}`;
-                })()}
-              </span>
-              <button
-                type="button"
-                onClick={goToNextReport}
-                disabled={!canGoNext()}
-                title="Próximo Relatório (Ctrl/Cmd + →)"
-              >
-                Próximo ➡️
-              </button>
-            </div>
+
+            <button
+              type="button"
+              class="btn-download"
+              onClick={handleDownloadPDF}
+              title="Baixar PDF"
+              disabled={!currentReportId()}
+            >
+              📄 PDF
+            </button>
+
+            <button
+              type="button"
+              class="btn-download"
+              onClick={handleDownloadCSV}
+              title="Baixar CSV"
+              disabled={!currentReportId()}
+            >
+              📥 CSV
+            </button>
+
+            <button
+              type="button"
+              class="btn-delete"
+              onClick={handleDeleteReport}
+              title="Deletar este relatório"
+              disabled={!currentReportId()}
+            >
+              ✖ DELETAR
+            </button>
           </div>
-        </Show>
+        </div>
+      </div>
+      <div class="content-area">
+        <div class="form-container">
+          <form onSubmit={(e) => { e.preventDefault(); handleFormatForm(); }}>
+            <div class="form-grid">
+              {/* Item 1 */}
+              <div class="form-grid-item">
+                <IdentificationSection
+                  identification={() => form().identification}
+                  onUpdate={handleUpdateIdentification}
+                />
+              </div>
+
+              {/* Item 2 */}
+              <div class="form-grid-item">
+                <HistorySection
+                  history={() => form().history}
+                  predefinedOptions={HISTORY_OPTIONS}
+                  isOptionSelected={(option) => isOptionSelected('history', option)}
+                  onToggleOption={(option) => handleToggleOption('history', option)}
+                  onRemoveCustomOption={(option) => handleRemoveCustomOption('history', option)}
+                  getCustomOptions={() => getCustomOptions('history', HISTORY_OPTIONS)}
+                  onAddCustomOption={(value) => handleAddCustomOption('history', value)}
+                />
+              </div>
+
+              {/* Item 3 */}
+              <div class="form-grid-item">
+                <ResultsSection
+                  results={() => form().results}
+                  predefinedOptions={RESULTS_OPTIONS}
+                  onAdd={handleAddYearResult}
+                  onRemove={handleRemoveYearResult}
+                  onUpdate={handleUpdateYearResult}
+                />
+              </div>
+
+              {/* Item 4 */}
+              <div class="form-grid-item">
+                <ConclusionSection
+                  conclusion={() => form().conclusion}
+                  onUpdate={(value) => handleUpdateField('conclusion', value)}
+                />
+              </div>
+
+              {/* Item 5 */}
+              <div class="form-grid-item">
+                <RecommendationsSection
+                  recommendations={() => form().recommendations}
+                  predefinedOptions={RECOMMENDATIONS_OPTIONS}
+                  isOptionSelected={(option) => isOptionSelected('recommendations', option)}
+                  onToggleOption={(option) => handleToggleOption('recommendations', option)}
+                  onRemoveCustomOption={(option) => handleRemoveCustomOption('recommendations', option)}
+                  getCustomOptions={() => getCustomOptions('recommendations', RECOMMENDATIONS_OPTIONS)}
+                  onAddCustomOption={(value) => handleAddCustomOption('recommendations', value)}
+                />
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {showPreview() && (
+          <div class="preview-container">
+            <RenderMarkdown content={content} />
+          </div>
+        )}
+      </div>
+
+      <Show when={currentReportId()}>
+        <div class="patient-navigation-bottom">
+          <button
+            type="button"
+            onClick={() => navigate('/patients')}
+            class="btn-back-to-list"
+            title="Voltar para lista de pacientes"
+          >
+            📋 Lista de Pacientes
+          </button>
+          <div class="navigation-controls">
+            <button
+              type="button"
+              onClick={goToPreviousReport}
+              disabled={!canGoPrevious()}
+              title="Relatório Anterior (Ctrl/Cmd + ←)"
+            >
+              ⬅️ Anterior
+            </button>
+            <span class="patient-counter">
+              {(() => {
+                const currentId = currentReportId();
+                if (!currentId) return '';
+                const idNum = typeof currentId === 'string' ? parseInt(currentId) : currentId;
+                const ids = allReportIds();
+                const currentIndex = ids.indexOf(idNum);
+                if (currentIndex === -1) return `ID ${currentId} de ${totalReports()}`;
+                return `${currentIndex + 1} de ${totalReports()}`;
+              })()}
+            </span>
+            <button
+              type="button"
+              onClick={goToNextReport}
+              disabled={!canGoNext()}
+              title="Próximo Relatório (Ctrl/Cmd + →)"
+            >
+              Próximo ➡️
+            </button>
+          </div>
+        </div>
       </Show>
     </div>
   );

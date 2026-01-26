@@ -61,7 +61,7 @@ export function createPDFContainer(
       ${htmlContent}
     </div>
     <div style="margin-top: 4cm; text-align: center; page-break-inside: avoid; width: 100%;">
-      <p style="margin: 0 auto 0.3cm auto;">________________________________________</p>
+      <p style="margin: 0 auto 0.3cm auto; font-family: monospace; letter-spacing: -2px;">------------------------------------------------------------</p>
       <p style="margin: 0; font-size: 11pt; font-weight: 700;">${settings.signatureName}</p>
       <p style="margin: 0; font-size: 10pt;">${settings.signatureCRFa}</p>
     </div>
@@ -97,6 +97,7 @@ export async function generatePDF(
       width: 170, // Content width (210mm - 40mm margins)
       windowWidth: 800, // Reference width for scaling
       margin: [10, 20, 15, 20], // top, right, bottom, left in mm
+      autoPaging: 'text', // Fix for duplication on page breaks
     }).catch(reject);
   });
 }

@@ -216,9 +216,9 @@
 
             .id {
                 display: inline-block;
-                padding: 0.3rem 0.5rem;
+                padding: 0.3rem 0.4rem;
                 margin: 0;
-                font-size: 0.5em;
+                font-size: 0.4em;
                 border-radius: 8px;
                 background: #efefef;
                 color: #aaa;
@@ -282,15 +282,25 @@
 
             button {
                 white-space: nowrap;
-                font-size: 0.9rem;
-                padding: 0.75rem 1.25rem;
+                font-size: 0.7rem;
+                padding: 0.5rem 1rem;
 
-                &.btn-clear {
+                &.btn-delete {
                     background: var(--error);
                     color: var(--color-lightest);
 
                     &:hover {
                         background: var(--error-dark);
+                        transform: translateY(-1px);
+                    }
+                }
+
+                &.btn-clear {
+                    background: var(--warning);
+                    color: var(--dark);
+
+                    &:hover {
+                        background: #e0a800;
                         transform: translateY(-1px);
                     }
                 }
