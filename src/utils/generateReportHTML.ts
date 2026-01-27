@@ -13,8 +13,22 @@ const STYLES = {
     noBreak: 'page-break-inside: avoid; break-inside: avoid;'
 };
 
-export const generateReportHTML = (report: Report): string => {
+type Spacer = {
+    id: string;
+    afterSection: 'identification' | 'history' | 'results' | 'conclusion' | 'recommendations';
+    height: number; // in cm
+};
+
+export const generateReportHTML = (report: Report, spacers: Spacer[] = []): string => {
     let html = '';
+
+    // Helper function to add spacers after a section
+    const addSpacersAfter = (sectionName: Spacer['afterSection']) => {
+        const sectionSpacers = spacers.filter(s => s.afterSection === sectionName);
+        sectionSpacers.forEach(spacer => {
+            html += `<div style="height: ${spacer.height}cm;"></div>`;
+        });
+    };
 
     // Title
     html += `<div style="${STYLES.section}">`;
@@ -46,6 +60,7 @@ export const generateReportHTML = (report: Report): string => {
     });
 
     html += `</div>`;
+    addSpacersAfter('identification');
 
     // 2. Histórico
     if (report.history && report.history.length > 0) {
@@ -57,6 +72,7 @@ export const generateReportHTML = (report: Report): string => {
         });
         html += `</ul>`;
         html += `</div>`;
+        addSpacersAfter('history');
     }
 
     // 3. Resultados
@@ -83,6 +99,7 @@ export const generateReportHTML = (report: Report): string => {
             html += `</div>`;
         });
         html += `</div>`;
+        addSpacersAfter('results');
     }
 
     // 4. Conclusão
@@ -98,6 +115,7 @@ export const generateReportHTML = (report: Report): string => {
             html += `</div>`;
         });
         html += `</div>`;
+        addSpacersAfter('conclusion');
     }
 
     // 5. Recomendações
@@ -110,7 +128,9 @@ export const generateReportHTML = (report: Report): string => {
         });
         html += `</ul>`;
         html += `</div>`;
+        addSpacersAfter('recommendations');
     }
 
     return html;
 };
+

@@ -1,4 +1,4 @@
-import { Index, Accessor, createEffect, on } from "solid-js";
+import { Index, Accessor, createEffect, on, JSX } from "solid-js";
 
 type ResultEntry = {
   year: string;
@@ -11,6 +11,7 @@ type Props = {
   onAdd: () => void;
   onRemove: (index: number) => void;
   onUpdate: (index: number, year: string, text: string) => void;
+  children?: JSX.Element;
 };
 
 export default function ResultsSection(props: Props) {
@@ -86,6 +87,7 @@ export default function ResultsSection(props: Props) {
           + Adicionar Resultado
         </button>
       </div>
+      {props.children}
     </div>
   );
 }

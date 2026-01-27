@@ -1,4 +1,4 @@
-import { createSignal, onMount, createEffect, Show } from "solid-js";
+import { createSignal, onMount, createEffect, Show, For } from "solid-js";
 import { useSearchParams, useNavigate } from "@solidjs/router";
 import toast from "solid-toast";
 import RenderMarkdown from "../RenderMarkdown";
@@ -19,6 +19,12 @@ import { formatDateUTC } from "../../utils/dateUtils";
 type ResultEntry = {
   year: string;
   text: string;
+};
+
+type Spacer = {
+  id: string;
+  afterSection: 'identification' | 'history' | 'results' | 'conclusion' | 'recommendations';
+  height: number; // in cm
 };
 
 type FormData = {
@@ -90,6 +96,7 @@ export default function Editor() {
     recommendations: []
   });
   const [content, setContent] = createSignal("");
+  const [spacers, setSpacer] = createSignal<Spacer[]>([]);
 
   // Start with false to match SSR, then load from localStorage on client
   const [showPreview, setShowPreview] = createSignal(false);
@@ -469,6 +476,24 @@ export default function Editor() {
     return form()[field]?.filter(item => !predefinedOptions.includes(item)) || [];
   };
 
+  // Spacer handlers
+  const handleAddSpacer = (afterSection: Spacer['afterSection']) => {
+    const newSpacer: Spacer = {
+      id: `spacer-${Date.now()}`,
+      afterSection,
+      height: 2 // Default 2cm
+    };
+    setSpacer(prev => [...prev, newSpacer]);
+  };
+
+  const handleRemoveSpacer = (id: string) => {
+    setSpacer(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleUpdateSpacerHeight = (id: string, height: number) => {
+    setSpacer(prev => prev.map(s => s.id === id ? { ...s, height } : s));
+  };
+
   // Year results handlers - works with structured format internally
   const handleAddYearResult = () => {
     setForm((prev) => ({
@@ -501,7 +526,7 @@ export default function Editor() {
   // Main function to render form into template
   const renderTemplate = () => {
     const reportData = formAsReport();
-    const htmlContent = generateReportHTML(reportData as Report);
+    const htmlContent = generateReportHTML(reportData as Report, spacers());
     const currentSettings = settings();
 
     // Use the same container function as PDF generation
@@ -602,7 +627,7 @@ export default function Editor() {
 
       const currentSettings = settings();
       // Generate HTML directly for PDF
-      const htmlContent = generateReportHTML(formAsReport() as Report);
+      const htmlContent = generateReportHTML(formAsReport() as Report, spacers());
       const patientName = form().identification.name || 'Paciente';
       const filename = `Relatório Audiométrico - ${patientName}.pdf`;
 
@@ -841,7 +866,44 @@ export default function Editor() {
                 <IdentificationSection
                   identification={() => form().identification}
                   onUpdate={handleUpdateIdentification}
-                />
+                >
+                  {/* Spacer Control after Identification */}
+                  <div class="spacer-control">
+                    <button
+                      type="button"
+                      class="btn-add-spacer"
+                      onClick={() => handleAddSpacer('identification')}
+                      title="Adicionar espaçador após Identificação"
+                    >
+                      ➕ Espaçador
+                    </button>
+                    <For each={spacers().filter(s => s.afterSection === 'identification')}>
+                      {(spacer) => (
+                        <div class="spacer-item">
+                          <label>
+                            Altura: {spacer.height}cm
+                            <input
+                              type="range"
+                              min="0.5"
+                              max="10"
+                              step="0.5"
+                              value={spacer.height}
+                              onInput={(e) => handleUpdateSpacerHeight(spacer.id, parseFloat(e.currentTarget.value))}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            class="btn-remove-spacer"
+                            onClick={() => handleRemoveSpacer(spacer.id)}
+                            title="Remover espaçador"
+                          >
+                            ✖
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </IdentificationSection>
               </div>
 
               {/* Item 2 */}
@@ -854,7 +916,44 @@ export default function Editor() {
                   onRemoveCustomOption={(option) => handleRemoveCustomOption('history', option)}
                   getCustomOptions={() => getCustomOptions('history', HISTORY_OPTIONS)}
                   onAddCustomOption={(value) => handleAddCustomOption('history', value)}
-                />
+                >
+                  {/* Spacer Control after History */}
+                  <div class="spacer-control">
+                    <button
+                      type="button"
+                      class="btn-add-spacer"
+                      onClick={() => handleAddSpacer('history')}
+                      title="Adicionar espaçador após Histórico"
+                    >
+                      ➕ Espaçador
+                    </button>
+                    <For each={spacers().filter(s => s.afterSection === 'history')}>
+                      {(spacer) => (
+                        <div class="spacer-item">
+                          <label>
+                            Altura: {spacer.height}cm
+                            <input
+                              type="range"
+                              min="0.5"
+                              max="10"
+                              step="0.5"
+                              value={spacer.height}
+                              onInput={(e) => handleUpdateSpacerHeight(spacer.id, parseFloat(e.currentTarget.value))}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            class="btn-remove-spacer"
+                            onClick={() => handleRemoveSpacer(spacer.id)}
+                            title="Remover espaçador"
+                          >
+                            ✖
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </HistorySection>
               </div>
 
               {/* Item 3 */}
@@ -865,7 +964,44 @@ export default function Editor() {
                   onAdd={handleAddYearResult}
                   onRemove={handleRemoveYearResult}
                   onUpdate={handleUpdateYearResult}
-                />
+                >
+                  {/* Spacer Control after Results */}
+                  <div class="spacer-control">
+                    <button
+                      type="button"
+                      class="btn-add-spacer"
+                      onClick={() => handleAddSpacer('results')}
+                      title="Adicionar espaçador após Resultados"
+                    >
+                      ➕ Espaçador
+                    </button>
+                    <For each={spacers().filter(s => s.afterSection === 'results')}>
+                      {(spacer) => (
+                        <div class="spacer-item">
+                          <label>
+                            Altura: {spacer.height}cm
+                            <input
+                              type="range"
+                              min="0.5"
+                              max="10"
+                              step="0.5"
+                              value={spacer.height}
+                              onInput={(e) => handleUpdateSpacerHeight(spacer.id, parseFloat(e.currentTarget.value))}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            class="btn-remove-spacer"
+                            onClick={() => handleRemoveSpacer(spacer.id)}
+                            title="Remover espaçador"
+                          >
+                            ✖
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </ResultsSection>
               </div>
 
               {/* Item 4 */}
@@ -873,7 +1009,44 @@ export default function Editor() {
                 <ConclusionSection
                   conclusion={() => form().conclusion}
                   onUpdate={(value) => handleUpdateField('conclusion', value)}
-                />
+                >
+                  {/* Spacer Control after Conclusion */}
+                  <div class="spacer-control">
+                    <button
+                      type="button"
+                      class="btn-add-spacer"
+                      onClick={() => handleAddSpacer('conclusion')}
+                      title="Adicionar espaçador após Conclusão"
+                    >
+                      ➕ Espaçador
+                    </button>
+                    <For each={spacers().filter(s => s.afterSection === 'conclusion')}>
+                      {(spacer) => (
+                        <div class="spacer-item">
+                          <label>
+                            Altura: {spacer.height}cm
+                            <input
+                              type="range"
+                              min="0.5"
+                              max="10"
+                              step="0.5"
+                              value={spacer.height}
+                              onInput={(e) => handleUpdateSpacerHeight(spacer.id, parseFloat(e.currentTarget.value))}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            class="btn-remove-spacer"
+                            onClick={() => handleRemoveSpacer(spacer.id)}
+                            title="Remover espaçador"
+                          >
+                            ✖
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </ConclusionSection>
               </div>
 
               {/* Item 5 */}
@@ -887,6 +1060,43 @@ export default function Editor() {
                   getCustomOptions={() => getCustomOptions('recommendations', RECOMMENDATIONS_OPTIONS)}
                   onAddCustomOption={(value) => handleAddCustomOption('recommendations', value)}
                 />
+
+                {/* Spacer Control after Recommendations */}
+                <div class="spacer-control">
+                  <button
+                    type="button"
+                    class="btn-add-spacer"
+                    onClick={() => handleAddSpacer('recommendations')}
+                    title="Adicionar espaçador após Recomendações"
+                  >
+                    ➕ Espaçador
+                  </button>
+                  <For each={spacers().filter(s => s.afterSection === 'recommendations')}>
+                    {(spacer) => (
+                      <div class="spacer-item">
+                        <label>
+                          Altura: {spacer.height}cm
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="10"
+                            step="0.5"
+                            value={spacer.height}
+                            onInput={(e) => handleUpdateSpacerHeight(spacer.id, parseFloat(e.currentTarget.value))}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          class="btn-remove-spacer"
+                          onClick={() => handleRemoveSpacer(spacer.id)}
+                          title="Remover espaçador"
+                        >
+                          ✖
+                        </button>
+                      </div>
+                    )}
+                  </For>
+                </div>
               </div>
             </div>
           </form>

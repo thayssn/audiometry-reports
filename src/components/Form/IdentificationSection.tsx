@@ -1,4 +1,4 @@
-import { Accessor } from "solid-js";
+import { Accessor, JSX } from "solid-js";
 import { getFieldLabel } from "../../config/fields";
 
 // IMPORTANT: When adding identification fields, update src/config/fields.ts first
@@ -17,6 +17,7 @@ type IdentificationData = {
 type Props = {
     identification: Accessor<IdentificationData>;
     onUpdate: (field: keyof IdentificationData, value: string | number | null) => void;
+    children?: JSX.Element;
 };
 
 export default function IdentificationSection(props: Props) {
@@ -118,7 +119,9 @@ export default function IdentificationSection(props: Props) {
                     />
                 </div>
             </div>
+            {props.children}
         </div>
     );
 }
+
 

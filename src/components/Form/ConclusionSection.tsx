@@ -1,8 +1,9 @@
-import { Accessor } from "solid-js";
+import { Accessor, JSX } from "solid-js";
 
 type Props = {
     conclusion: Accessor<string>;
     onUpdate: (value: string) => void;
+    children?: JSX.Element;
 };
 
 export default function ConclusionSection(props: Props) {
@@ -11,13 +12,14 @@ export default function ConclusionSection(props: Props) {
             <h3>4. Conclusão</h3>
             <div>
                 <label for="conclusion">Conclusão</label>
-                <textarea 
-                  id="conclusion" 
-                  rows={3}
-                  value={props.conclusion()}
-                  onInput={(e) => props.onUpdate(e.currentTarget.value)}
+                <textarea
+                    id="conclusion"
+                    rows={3}
+                    value={props.conclusion()}
+                    onInput={(e) => props.onUpdate(e.currentTarget.value)}
                 />
             </div>
+            {props.children}
         </div>
     );
 }
