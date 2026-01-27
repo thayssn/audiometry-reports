@@ -9,7 +9,7 @@ import ConclusionSection from "./ConclusionSection";
 import RecommendationsSection from "./RecommendationsSection";
 import { dbService, Report, isReportComplete, AppSettings, DEFAULT_SETTINGS } from "../../services/dbService";
 import { getCSVFields } from "../../config/fields";
-import { generatePDF } from "../../utils/pdfGenerator";
+import { generatePDF, createPDFContainer } from "../../utils/pdfGenerator";
 import { formatReportContent } from "../../utils/formatContent";
 import { generateReportHTML } from "../../utils/generateReportHTML";
 import { formatDateUTC } from "../../utils/dateUtils";
@@ -501,9 +501,15 @@ export default function Editor() {
   // Main function to render form into template
   const renderTemplate = () => {
     const reportData = formAsReport();
-    const formattedContent = formatReportContent(reportData as Report);
-    setContent(formattedContent);
-    return formattedContent;
+    const htmlContent = generateReportHTML(reportData as Report);
+    const currentSettings = settings();
+
+    // Use the same container function as PDF generation
+    const container = createPDFContainer(htmlContent, currentSettings);
+    const fullHTML = container.innerHTML;
+
+    setContent(fullHTML);
+    return fullHTML;
   };
 
   const handleFormatForm = () => {

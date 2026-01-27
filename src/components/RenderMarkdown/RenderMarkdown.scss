@@ -94,12 +94,12 @@
 .print-page {
   text-align: left;
   background-color: var(--color-background-lightest);
-  overflow-y: auto;
   box-shadow: 4px 4px 15px 0 var(--color-background-dark);
   padding: 1cm 1.5cm 2cm 1.5cm;
   line-height: 1.2;
   font-size: 0.34cm;
-  max-width: 21cm;
+  width: 21cm; // A4 width
+  min-height: 29.7cm; // A4 height
   box-sizing: border-box;
 
   @media print {
@@ -115,7 +115,7 @@
     }
   }
 
-  .print-logo{
+  .print-logo {
     max-width: 40%;
     margin: 2cm auto;
     display: block;
@@ -131,12 +131,12 @@
     }
   }
 
-  #signature{
+  #signature {
     position: relative;
     right: -50%;
     width: 50%;
     padding: 0.2cm 2cm 1cm;
-    border-top: 1px solid black; 
+    border-top: 1px solid black;
     text-align: center;
     margin-top: 2cm;
   }
@@ -256,5 +256,17 @@
 
   li {
     margin: 0.2cm 0 0 0.6cm;
+  }
+
+
+  // Page break visualization - handled by JavaScript in component
+  .print-page-content {
+    position: relative;
+  }
+
+  @media print {
+    .page-break-indicator {
+      display: none !important;
+    }
   }
 }
