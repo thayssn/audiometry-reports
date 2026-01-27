@@ -39,8 +39,8 @@ export const generateReportHTML = (report: Report): string => {
     identificationFields.forEach(field => {
         html += `<div style="${STYLES.noBreak}">`;
         html += `<p style="${STYLES.p} display: flex; align-items: baseline;">`;
-        html += `<strong style="${STYLES.strong} min-width: 0.5cm; flex-shrink: 0;">${field.label}</strong>`;
-        html += `<span style="margin-left: 0.1cm;">- ${field.value}</span>`;
+        html += `<span style="${STYLES.strong} min-width: 0.5cm; flex-shrink: 0;">${field.label}:</span>`;
+        html += `<span style="margin-left: 0.1cm;"> ${field.value}</span>`;
         html += `</p>`;
         html += `</div>`;
     });
@@ -74,7 +74,7 @@ export const generateReportHTML = (report: Report): string => {
                 const text = r.substring(dashIndex + 3);
                 // Use a table-like structure for better alignment
                 html += `<p style="${STYLES.p} display: flex; align-items: baseline;">`;
-                html += `<strong style="${STYLES.strong} min-width: 0.5cm; flex-shrink: 0;">${year}</strong>`;
+                html += `<span style="${STYLES.strong} min-width: 0.5cm; flex-shrink: 0;">${year}</span>`;
                 html += `<span style="margin-left: 0.1cm;">- ${text}</span>`;
                 html += `</p>`;
             } else {
