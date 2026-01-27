@@ -9,7 +9,7 @@ const STYLES = {
     strong: 'font-weight: 700;',
     ul: 'margin: 0.3cm 0 0 -1cm; padding-bottom: 0;',
     li: 'line-height: 1.8; page-break-inside: avoid;',
-    section: 'margin-bottom: 1cm;',
+    section: 'margin-bottom: 1cm; page-break-inside: avoid;',
     noBreak: 'page-break-inside: avoid; break-inside: avoid;'
 };
 
