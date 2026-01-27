@@ -783,6 +783,16 @@ export default function Editor() {
           <div class="form-actions">
             <button
               type="button"
+              class="btn-save"
+              onClick={handleSaveForm}
+              title="Salvar relatório (Ctrl/Cmd + S)"
+              disabled={isSaving()}
+            >
+              💾 {isSaving() ? 'Salvando...' : 'SALVAR'}
+            </button>
+
+            <button
+              type="button"
               class="btn-toggle-preview"
               onClick={() => setShowPreview(!showPreview())}
               title={showPreview() ? "Ocultar pré-visualização" : "Mostrar pré-visualização"}
